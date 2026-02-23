@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>THE SYSTEM | AWAKENING</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #030508;
+            --accent: #00d4ff;
+            --danger: #ff3e3e;
+            --success: #00ff95;
+            --border: rgba(255,255,255,0.1);
+        }
+
+        /* Responsive Mobile Frame */
+        body { 
+            background: var(--bg); 
+            color: #e0e0e0; 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            height: 100dvh;
+            position: relative;
+            background: radial-gradient(circle at top, #0a0f18 0%, #030508 100%);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Cinematic Overlays */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 5000;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .hologram {
+            border: 1px solid var(--accent);
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            animation: expand 0.4s ease-out;
+            background: rgba(0, 20, 40, 0.4);
+        }
+
+        /* Header Layout */
+        header { 
+            padding: 50px 25px 20px; 
+            border-bottom: 1px solid var(--border); 
+            background: rgba(0,0,0,0.3);
+        }
+
+        .hunter-name { 
+            font-family: 'JetBrains Mono'; 
+            font-size: 0.75rem; 
+            color: var(--accent); 
+            letter-spacing: 4px; 
+            text-transform: uppercase; 
+        }
+
+        .rank-box { 
+            font-family: 'JetBrains Mono'; 
+            font-size: 0.6rem; 
+            color: #555; 
+            letter-spacing: 2px; 
+        }
+
+        .lvl-text { font-size: 2.5rem; font-weight: 300; margin: 5px 0; }
+
+        .exp-bar { 
+            width: 100%; 
+            height: 2px; 
+            background: #111; 
+            margin-top: 15px; 
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .exp-fill { 
+            height: 100%; 
+            background: var(--accent); 
+            width: 0%; 
+            transition: 1.5s cubic-bezier(0.19, 1, 0.22, 1); 
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        /* Scrollable Content Area */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 25px 120px; /* Space for Nav */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Stats & Pentagraph */
+        .chart-wrap { 
+            width: 100%; 
+            max-width: 300px; 
+            margin: 0 auto 25px; 
+        }
+
+        .quest-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 8px;
+        }
+
+        .quest-card.done { border-color: var(--success); opacity: 0.4; }
+
+        #timer { 
+            font-family: 'JetBrains Mono'; 
+            font-size: 2.2rem; 
+            text-align: center; 
+            margin-bottom: 30px; 
+            color: var(--accent); 
+            text-shadow: 0 0 10px rgba(0,212,255,0.4);
+        }
+
+        /* Mobile-First Navigation */
+        nav {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 85px;
+            background: rgba(5, 7, 10, 0.98);
+            border-top: 1px solid var(--border);
+            display: flex;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 4000;
+        }
+
+        nav button {
+            flex: 1;
+            background: none;
+            border: none;
+            color: #444;
+            font-family: 'JetBrains Mono';
+            font-size: 0.65rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        nav button.active {
+            color: var(--accent);
+            text-shadow: 0 0 8px var(--accent);
+        }
+
+        nav button.active::after {
+            content: '';
+            width: 15px;
+            height: 2px;
+            background: var(--accent);
+            margin-top: 8px;
+        }
+
+        .btn { 
+            background: transparent; 
+            border: 1px solid var(--accent); 
+            color: var(--accent); 
+            padding: 14px 30px; 
+            font-family: 'JetBrains Mono'; 
+            cursor: pointer; 
+            text-transform: uppercase; 
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+        }
+
+        @keyframes expand { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="notice-overlay" class="overlay">
+        <div class="hologram">
+            <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem; margin-bottom:15px;">[ NOTICE ]</div>
+            <p>You have met the requirements for the <b>"Player"</b> Awakening.</p>
+            <button class="btn" onclick="showAuth()">Initialize Link</button>
+        </div>
+    </div>
+
+    <div id="auth-overlay" class="overlay hidden">
+        <div class="hologram">
+            <h2 style="font-weight: 300;">IDENTITY <br><b>SYNCHRONIZATION</b></h2>
+            <button class="btn" onclick="signIn()">Sign in with Google</button>
+        </div>
+    </div>
+
+    <header id="main-header" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+            <div>
+                <span class="hunter-name" id="disp-name">PLAYER_UNKNOWN</span>
+                <div id="rank-display" class="rank-box">RANK: E</div>
+                <div id="job-display" style="font-size: 0.5rem; color: var(--accent); opacity: 0.5;">UNAWAKENED</div>
+                <div class="lvl-text">LVL <span id="lvl-display">01</span></div>
+            </div>
+            <div style="text-align: right;">
+                <div class="rank-box">STREAK</div>
+                <div style="font-size: 1.2rem; color: var(--accent);" id="streak-display">0</div>
+            </div>
+        </div>
+        <div class="exp-bar"><div id="exp-fill" class="exp-fill"></div></div>
+    </header>
+
+    <div id="main-content" class="content hidden"></div>
+
+    <nav id="main-nav" class="hidden">
+        <button onclick="render('status')" id="nav-status">STATUS</button>
+        <button onclick="render('mission')" id="nav-mission">QUESTS</button>
+        <button onclick="render('cargo')" id="nav-cargo">INVENTORY</button>
+    </nav>
+</div>
+
+<script>
+    // --- FIREBASE CONFIG ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyBBveJmrWxVnnalA34G7KZR6COhrOcxiok",
+        authDomain: "solo-levelling-system-5edae.firebaseapp.com",
+        projectId: "solo-levelling-system-5edae",
+        storageBucket: "solo-levelling-system-5edae.firebasestorage.app",
+        messagingSenderId: "800420338485",
+        appId: "1:800420338485:web:faa95b0a692fe9abb8ca7c"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const provider = new firebase.auth.GoogleAuthProvider();
+
+    let p = null; 
+    let timerId = null;
+    let statsChart = null;
+
+    // --- AUTH ---
+    auth.onAuthStateChanged(user => {
+        if (user) syncHunter(user);
+    });
+
+    async function signIn() {
+        await auth.signInWithPopup(provider);
+    }
+
+    function showAuth() {
+        document.getElementById('notice-overlay').classList.add('hidden');
+        document.getElementById('auth-overlay').classList.remove('hidden');
+    }
+
+    // --- DATA SYNC ---
+    async function syncHunter(user) {
+        const docRef = db.collection('hunters').doc(user.uid);
+        const doc = await docRef.get();
+
+        if (doc.exists) {
+            p = doc.data();
+            checkSystemDay();
+        } else {
+            p = {
+                name: user.displayName, level: 1, exp: 0, streak: 0, job: "UNAWAKENED",
+                stats: { STR: 10, AGI: 10, VIT: 10, INT: 10, FOC: 10 },
+                cargo: {}, missions: [], lastUpdate: new Date().toDateString()
+            };
+            await docRef.set(p);
+        }
+        boot();
+    }
+
+    function boot() {
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('header, nav, #main-content').forEach(el => el.classList.remove('hidden'));
+        document.getElementById('disp-name').innerText = p.name.toUpperCase();
+        if (!p.missions || p.missions.length === 0) generateQuests();
+        updateUI();
+        render('status');
+    }
+
+    function save() { 
+        if(auth.currentUser) db.collection('hunters').doc(auth.currentUser.uid).update(p); 
+    }
+
+    function checkSystemDay() {
+        const today = new Date().toDateString();
+        if (p.lastUpdate !== today) {
+            const incomplete = p.missions.some(m => !m.done);
+            if (incomplete && p.level > 1) {
+                p.level--; p.streak = 0;
+                alert("PENALTY PROTOCOL: Daily Quest Incomplete. Level Reduced.");
+            }
+            p.lastUpdate = today;
+            generateQuests();
+            save();
+        }
+    }
+
+    // --- MISSIONS ---
+    function generateQuests() {
+        const d = 10 + (p.level * 2);
+        const pool = [
+            { s: 'STR', n: 'Push-ups', r: d },
+            { s: 'STR', n: 'Squats', r: d * 2 },
+            { s: 'STR', n: 'Jumping Squats', r: d * 2 },
+            { s: 'STR', n: 'Pull-ups', r: d * 2 },
+            { s: 'STR', n: 'Sit-ups', r: d * 2 },
+            { s: 'STR', n: 'Lunges', r: d * 2 },
+            { s: 'STR', n: 'Crunches', r: d * 2 },
+            { s: 'STR', n: 'Dips', r: d * 2 },
+            { s: 'AGI', n: 'Burpees', r: Math.floor(d/2) },
+            { s: 'AGI', n: 'High Knees', r: Math.floor(d/2) },
+            { s: 'AGI', n: 'Standing Run', r: Math.floor(d/2) },
+            { s: 'AGI', n: 'High jumps', r: Math.floor(d/2) },
+            { s: 'AGI', n: 'Jump rope', r: Math.floor(d/2) },
+            { s: 'AGI', n: 'Split jumps', r: Math.floor(d/2) },
+            { s: 'VIT', n: 'Cold Shower', r: '3 Minutes' },
+            { s: 'VIT', n: 'Fast walk', r: '3 Minutes' },
+            { s: 'VIT', n: 'Running/Cycling', r: '5KM' },
+            { s: 'VIT', n: 'Shadow Box', r: '3 Minutes' },
+            { s: 'INT', n: 'Deep Work', r: '40 Minutes' },
+            { s: 'INT', n: 'Play Chess', r: '40 Minutes' },
+            { s: 'INT', n: 'Learn new skill', r: '40 Minutes' },
+            { s: 'INT', n: 'Study', r: '40 Minutes' },
+            { s: 'INT', n: 'Knowledge', r: '40 Minutes' },
+            { s: 'FOC', n: 'No Phone', r: '1 Hour' },
+            { s: 'FOC', n: 'Meditate', r: '30 Minutes' },
+            { s: 'FOC', n: 'Box Breathing', r: '5 Minutes' },
+            { s: 'FOC', n: 'Thinking', r: '30 Minutes' },
+            { s: 'FOC', n: 'Book Reading', r: '30 Minutes' },
+            { s: 'FOC', n: 'Write about your day', r: '10 Minutes' }
+        ];
+        p.missions = pool.sort(() => 0.5 - Math.random()).slice(0, 5).map((q, i) => ({ ...q, id: i, done: false }));
+        save();
+    }
+
+    function completeMission(id) {
+        if (p.missions[id].done) return;
+        p.missions[id].done = true;
+        p.stats[p.missions[id].s]++;
+        p.exp += 20;
+
+        if (p.missions.every(m => m.done)) {
+            p.streak++;
+            const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token"];
+            const r = rewards[Math.floor(Math.random()*rewards.length)];
+            p.cargo[r] = (p.cargo[r] || 0) + 1;
+            alert("QUEST CLEAR. REWARD: " + r);
+        }
+
+        if (p.exp >= p.level * 100) {
+            p.level++; p.exp = 0;
+            if (p.level === 40) alert("JOB CHANGE QUEST AVAILABLE.");
+        }
+        save(); updateUI(); render('mission');
+    }
+
+    // --- TAB RENDERING ---
+    function render(tab) {
+        const cont = document.getElementById('main-content');
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById('nav-' + tab).classList.add('active');
+        if (timerId) clearInterval(timerId);
+
+        if (tab === 'status') {
+            cont.innerHTML = `
+                <div class="chart-wrap"><canvas id="statsChart"></canvas></div>
+                <div>` + Object.entries(p.stats).map(([k,v]) => `
+                <div style="display:flex; justify-content:space-between; padding:15px 0; border-bottom:1px solid #111; font-family:'JetBrains Mono'; font-size:0.85rem;">
+                    <span style="color:#555;">${k}</span><span>${v}</span>
+                </div>`).join('') + `</div>`;
+            initChart();
+        } else if (tab === 'mission') {
+            cont.innerHTML = `<div id="timer">00:00:00</div>` + p.missions.map(m => `
+                <div class="quest-card ${m.done ? 'done' : ''}" onclick="completeMission(${m.id})">
+                    <div><span class="quest-req">${m.s}</span><br><span class="quest-title">${m.n}</span></div>
+                    <div class="quest-req">REQ: ${m.r}</div>
+                </div>`).join('');
+            timerId = setInterval(updateTimer, 1000); updateTimer();
+        } else if (tab === 'cargo') {
+            cont.innerHTML = Object.entries(p.cargo).map(([n,c]) => c > 0 ? `
+                <div class="quest-card"><span>${n}</span><span style="color:var(--accent)">x${c}</span></div>` : '').join('');
+        }
+    }
+
+    function initChart() {
+        const ctx = document.getElementById('statsChart').getContext('2d');
+        if(statsChart) statsChart.destroy();
+        statsChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['STR', 'AGI', 'VIT', 'INT', 'FOC'],
+                datasets: [{
+                    data: [p.stats.STR, p.stats.AGI, p.stats.VIT, p.stats.INT, p.stats.FOC],
+                    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                    borderColor: '#00d4ff',
+                    borderWidth: 2,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        angleLines: { color: 'rgba(255,255,255,0.05)' },
+                        pointLabels: { color: '#666', font: { family: 'JetBrains Mono', size: 11 } },
+                        ticks: { display: false },
+                        suggestedMin: 0
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function updateTimer() {
+        const el = document.getElementById('timer');
+        if(!el) return;
+        const end = new Date(); end.setHours(23,59,59,999);
+        const diff = end - new Date();
+        const h = Math.floor(diff/3600000).toString().padStart(2,'0');
+        const m = Math.floor((diff%3600000)/60000).toString().padStart(2,'0');
+        const s = Math.floor((diff%60000)/1000).toString().padStart(2,'0');
+        el.innerText = `${h}:${m}:${s}`;
+    }
+
+    function updateUI() {
+        document.getElementById('lvl-display').innerText = p.level.toString().padStart(2, '0');
+        document.getElementById('streak-display').innerText = p.streak;
+        document.getElementById('job-display').innerText = p.job;
+        document.getElementById('rank-display').innerText = "RANK: " + ['E','D','C','B','A','S'][Math.min(Math.floor(p.level/15), 5)];
+        document.getElementById('exp-fill').style.width = (p.exp / (p.level * 100) * 100) + "%";
+    }
+</script>
+</body>
+</html>
