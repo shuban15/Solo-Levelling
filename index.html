@@ -242,6 +242,27 @@
 </div>
 
 <script>
+    const sounds = {
+    // Sharp electronic chime for notifications
+    ping: new Audio('https://assets.mixkit.co/active_storage/sfx/2861/2861-preview.mp3'),
+    // Level up "Shimmer"
+    levelUp: new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3'),
+    // Low mechanical click for UI interaction
+    click: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'),
+    // Error/Penalty sound
+    alert: new Audio('https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'),
+    // Digital "glitch" for Surprise Quests
+    surprise: new Audio('https://assets.mixkit.co/active_storage/sfx/1003/1003-preview.mp3')
+};
+
+// Function to play sounds with a slight volume adjustment
+function playSfx(type) {
+    if (sounds[type]) {
+        sounds[type].currentTime = 0; // Reset to start
+        sounds[type].volume = 0.4;    // Set to 40% volume
+        sounds[type].play().catch(e => console.log("Audio blocked: tap screen first"));
+    }
+}
     // --- FIREBASE CONFIG ---
     const firebaseConfig = {
         apiKey: "AIzaSyBBveJmrWxVnnalA34G7KZR6COhrOcxiok",
@@ -362,6 +383,7 @@
 
     function completeMission(id) {
         if (p.missions[id].done) return;
+        playSfx('click');
         p.missions[id].done = true;
         p.stats[p.missions[id].s]++;
         p.exp += 20;
@@ -376,8 +398,9 @@
         }
 
         if (p.exp >= p.level * 100) {
+            playSfx('levelUp');
             p.level++; p.exp = 0;
-            if (p.level === 40) alert("JOB CHANGE QUEST AVAILABLE.");
+            if (p.level === 40) showSystemmessage("JOB CHANGE QUEST AVAILABLE.");
         }
         save(); updateUI(); render('mission');
     }
@@ -395,6 +418,7 @@
 };
 
 function handleItemInteraction(itemName) {
+    playSfx('click');
     const now = Date.now();
     if (now - lastTap < 300) {
         consumeItem(itemName); // Double tap detected
@@ -506,9 +530,10 @@ function consumeItem(itemName) {
     }
     
     function showSystemMessage(title, body) {
-    const msg = document.createElement('div');
-    msg.className = 'overlay'; // Reuses your CSS overlay style
-    msg.innerHTML = `
+        playSfx('ping'); // <--- Add this line
+        const msg = document.createElement('div');
+        msg.className = 'overlay'; // Reuses your CSS overlay style
+        msg.innerHTML = `
         <div class="hologram">
             <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem;">[ SYSTEM MESSAGE ]</div>
             <h2 style="margin:15px 0; font-weight:300;">${title}</h2>
@@ -529,4 +554,5 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
