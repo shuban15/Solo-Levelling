@@ -260,6 +260,7 @@
     let p = null; 
     let timerId = null;
     let statsChart = null;
+    let lastTap = 0;
 
     // --- AUTH ---
     auth.onAuthStateChanged(user => {
@@ -367,10 +368,11 @@
 
         if (p.missions.every(m => m.done)) {
             p.streak++;
-            const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token"];
+            // Find this line inside completeMission or generateQuests
+            const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
             const r = rewards[Math.floor(Math.random()*rewards.length)];
             p.cargo[r] = (p.cargo[r] || 0) + 1;
-            alert("QUEST CLEAR. REWARD: " + r);
+            showSystemMessage("QUEST CLEAR. REWARD: " + r +" has been added to the inventory.");
         }
 
         if (p.exp >= p.level * 100) {
@@ -379,6 +381,46 @@
         }
         save(); updateUI(); render('mission');
     }
+    const itemEffects = {
+    "Rest Protocol": () => { p.stats.VIT += 5; return "VIT increased by 5."; },
+    "Dopamine Hit": () => { p.exp += 15; return "EXP increased by 15."; },
+    "Focus Token": () => { p.stats.FOC += 5; return "FOC increased by 5."; },
+    "Physical Restoration": () => { p.stats.STR += 2; p.stats.AGI += 2; return "Physical stats restored."; },
+    "Blessed Box": () => { 
+        const keys = Object.keys(p.stats);
+        const randomStat = keys[Math.floor(Math.random() * keys.length)];
+        p.stats[randomStat] += 5;
+        return `Blessed! ${randomStat} increased by 5.`;
+    }
+};
+
+function handleItemInteraction(itemName) {
+    const now = Date.now();
+    if (now - lastTap < 300) {
+        consumeItem(itemName); // Double tap detected
+    } else {
+        showSystemMessage("ITEM INFO", `${itemName}: Double-tap to consume.`);
+    }
+    lastTap = now;
+}
+
+function consumeItem(itemName) {
+    if (p.cargo[itemName] > 0) {
+        p.cargo[itemName] -= 1;
+        const resultText = itemEffects[itemName](); 
+        showSystemMessage("ITEM CONSUMED", resultText);
+        
+        // Level up check in case the item gave EXP
+        if (p.exp >= p.level * 100) {
+            p.level++;
+            p.exp = 0;
+            showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
+        }
+        save();
+        updateUI();
+        render('cargo'); // Refresh the inventory view
+    }
+}
 
     // --- TAB RENDERING ---
     function render(tab) {
@@ -403,9 +445,23 @@
                 </div>`).join('');
             timerId = setInterval(updateTimer, 1000); updateTimer();
         } else if (tab === 'cargo') {
-            cont.innerHTML = Object.entries(p.cargo).map(([n,c]) => c > 0 ? `
-                <div class="quest-card"><span>${n}</span><span style="color:var(--accent)">x${c}</span></div>` : '').join('');
-        }
+    const hasItems = Object.entries(p.cargo).some(([name, count]) => count > 0);
+    
+    if (!hasItems) {
+        cont.innerHTML = `<div style="text-align:center; padding-top:50px; color:#444; font-family:'JetBrains Mono'; font-size:0.7rem;">INVENTORY EMPTY</div>`;
+        return;
+    }
+
+    cont.innerHTML = `<div style="font-family:'JetBrains Mono'; font-size:0.6rem; color:var(--accent); margin-bottom:15px; letter-spacing:1px;">[ DOUBLE-TAP TO USE ITEM ]</div>` + 
+        Object.entries(p.cargo).map(([name, count]) => count > 0 ? `
+            <div class="quest-card" onclick="handleItemInteraction('${name}')" style="cursor:pointer;">
+                <div>
+                    <span class="quest-title">${name}</span>
+                    <div style="font-size:0.55rem; color:#555; margin-top:4px; font-family:'JetBrains Mono';">CONSUMABLE ITEM</div>
+                </div>
+                <span style="color:var(--accent); font-family:'JetBrains Mono'; font-size:1.2rem;">x${count}</span>
+            </div>` : '').join('');
+}
     }
 
     function initChart() {
@@ -448,6 +504,20 @@
         const s = Math.floor((diff%60000)/1000).toString().padStart(2,'0');
         el.innerText = `${h}:${m}:${s}`;
     }
+    
+    function showSystemMessage(title, body) {
+    const msg = document.createElement('div');
+    msg.className = 'overlay'; // Reuses your CSS overlay style
+    msg.innerHTML = `
+        <div class="hologram">
+            <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem;">[ SYSTEM MESSAGE ]</div>
+            <h2 style="margin:15px 0; font-weight:300;">${title}</h2>
+            <p style="font-size:0.9rem; color:#aaa; margin-bottom:20px;">${body}</p>
+            <button class="btn" onclick="this.parentElement.parentElement.remove()">Confirm</button>
+        </div>
+    `;
+    document.body.appendChild(msg);
+}
 
     function updateUI() {
         document.getElementById('lvl-display').innerText = p.level.toString().padStart(2, '0');
@@ -459,3 +529,4 @@
 </script>
 </body>
 </html>
+
