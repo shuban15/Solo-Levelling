@@ -423,16 +423,31 @@ function playSfx(type) {
 };
 
 function handleItemInteraction(itemName) {
-    playSfx('click');
     const now = Date.now();
-    if (now - lastTap < 300) {
-        consumeItem(itemName); // Double tap detected
+    const DOUBLE_TAP_THRESHOLD = 300; // milliseconds
+
+    if (now - lastTap < DOUBLE_TAP_THRESHOLD) {
+        // SUCCESS: Double Tap Detected
+        // Clear any pending single-tap messages if they exist
+        const existingOverlays = document.querySelectorAll('.overlay:not(#notice-overlay):not(#auth-overlay)');
+        existingOverlays.forEach(el => el.remove());
+        
+        consumeItem(itemName);
     } else {
-        showSystemMessage("ITEM INFO", `${itemName}: Double-tap to consume.`);
+        // POSSIBLY: Single Tap
+        // We set a timeout so the info doesn't pop up instantly if you're mid-double-tap
+        setTimeout(() => {
+            const checkAgain = Date.now();
+            if (checkAgain - lastTap >= DOUBLE_TAP_THRESHOLD) {
+                playSfx('click');
+                showSystemMessage("ITEM INFO", `${itemName}: Double-tap to consume and gain its effects.`);
+            }
+        }, DOUBLE_TAP_THRESHOLD);
     }
+    
     lastTap = now;
 }
-
+    
 function consumeItem(itemName) {
     if (p.cargo[itemName] > 0) {
         p.cargo[itemName] -= 1;
@@ -559,6 +574,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
