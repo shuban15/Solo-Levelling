@@ -59,6 +59,16 @@
             text-align: center;
         }
 
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+.btn-confirm { border-color: var(--success); color: var(--success); }
+.btn-cancel { border-color: var(--danger); color: var(--danger); }
+
         .hologram {
             border: 1px solid var(--accent);
             padding: 30px;
@@ -234,7 +244,12 @@
                 <div style="font-size: 1.2rem; color: var(--accent);" id="streak-display">0</div>
             </div>
         </div>
-        <div class="exp-bar"><div id="exp-fill" class="exp-fill"></div></div>
+        <div class="exp-bar">
+    <div id="exp-fill" class="exp-fill"></div>
+</div>
+<div id="exp-counter" style="font-family:'JetBrains Mono'; font-size:0.6rem; color:#555; text-align:right; margin-top:5px; letter-spacing:1px;">
+    0 / 100 EXP
+</div>
     </header>
 
     <div id="main-content" class="content hidden"></div>
@@ -386,83 +401,138 @@ function playSfx(type) {
         save();
     }
 
-    function completeMission(id) {
-        if (p.missions[id].done) return;
-        playSfx('click');
-        p.missions[id].done = true;
-        p.stats[p.missions[id].s]++;
-        p.exp += 20;
+    // Step 1: The Trigger (Asks the player)
+function completeMission(id) {
+    if (p.missions[id].done) return;
+    
+    playSfx('click');
+    
+    // Create the Confirmation Overlay
+    const confirmOverlay = document.createElement('div');
+    confirmOverlay.className = 'overlay';
+    confirmOverlay.id = 'confirm-overlay';
+    confirmOverlay.innerHTML = `
+        <div class="hologram">
+            <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem;">[ MISSION COMPLETION ]</div>
+            <h2 style="margin:15px 0; font-weight:300;">Confirm Results?</h2>
+            <p style="font-size:0.8rem; color:#aaa;">Have you truly completed: <br><b>${p.missions[id].n}</b>?</p>
+            <div class="btn-group">
+                <button class="btn btn-confirm" onclick="executeMission(${id})">YES</button>
+                <button class="btn btn-cancel" onclick="this.parentElement.parentElement.parentElement.remove()">NO</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(confirmOverlay);
+}
 
-        if (p.missions.every(m => m.done)) {
-            p.streak++;
-            // Find this line inside completeMission or generateQuests
-            const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
-            const r = rewards[Math.floor(Math.random()*rewards.length)];
-            p.cargo[r] = (p.cargo[r] || 0) + 1;
-            showSystemMessage("QUEST CLEAR. REWARD: " + r +" has been added to the inventory.");
-        }
+// Step 2: The Execution (Gives rewards)
+function executeMission(id) {
+    // Remove the confirmation box
+    document.getElementById('confirm-overlay').remove();
+    
+    // Mark as done
+    p.missions[id].done = true;
+    p.stats[p.missions[id].s]++;
+    p.exp += 20;
 
-        if (p.exp >= p.level * 100) {
-            playSfx('levelUp');
-            p.level++; p.exp = 0;
-            if (p.level === 40) showSystemmessage("JOB CHANGE QUEST AVAILABLE.");
-        }
-        save(); updateUI(); render('mission');
+    // Check for Surprise Quest (10% chance)
+    if (Math.random() < 0.10) { 
+        triggerSurpriseQuest(); 
     }
+
+    // Daily Clear Reward
+    if (p.missions.every(m => m.done)) {
+        p.streak++;
+        const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
+        const r = rewards[Math.floor(Math.random()*rewards.length)];
+        p.cargo[r] = (p.cargo[r] || 0) + 1;
+        showSystemMessage("QUEST CLEAR", `Reward: ${r} acquired.`);
+    }
+
+    // Level Up Check
+    if (p.exp >= p.level * 100) {
+        p.level++;
+        p.exp = 0;
+        playSfx('levelUp');
+        showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
+    }
+
+    save(); 
+    updateUI(); 
+    render('mission');
+}
     const itemEffects = {
-    "Rest Protocol": () => { p.stats.VIT += 5; return "VIT increased by 5."; },
-    "Dopamine Hit": () => { p.exp += 15; return "EXP increased by 15."; },
-    "Focus Token": () => { p.stats.FOC += 5; return "FOC increased by 5."; },
-    "Physical Restoration": () => { p.stats.STR += 2; p.stats.AGI += 2; return "Physical stats restored."; },
-    "Blessed Box": () => { 
-        const keys = Object.keys(p.stats);
-        const randomStat = keys[Math.floor(Math.random() * keys.length)];
-        p.stats[randomStat] += 5;
-        return `Blessed! ${randomStat} increased by 5.`;
+    "Rest Protocol": {
+        desc: "Increases Vitality (VIT) by 5. Restores physical fatigue.",
+        run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }
+    },
+    "Dopamine Hit": {
+        desc: "Grants an immediate 15 EXP boost to speed up leveling.",
+        run: () => { p.exp += 15; return "EXP increased by 15."; }
+    },
+    "Focus Token": {
+        desc: "Increases Focus (FOC) by 5. Enhances mental clarity.",
+        run: () => { p.stats.FOC += 5; return "FOC increased by 5."; }
+    },
+    "Physical Restoration": {
+        desc: "Increases Strength (STR) and Agility (AGI) by 2 each.",
+        run: () => { p.stats.STR += 2; p.stats.AGI += 2; return "Physical stats restored."; }
+    },
+    "Blessed Box": {
+        desc: "A random blessing. Grants +5 to a random stat.",
+        run: () => { 
+            const keys = Object.keys(p.stats);
+            const randomStat = keys[Math.floor(Math.random() * keys.length)];
+            p.stats[randomStat] += 5;
+            return `Blessed! ${randomStat} increased by 5.`;
+        }
     }
 };
 
 function handleItemInteraction(itemName) {
     const now = Date.now();
-    const DOUBLE_TAP_THRESHOLD = 300; // milliseconds
+    const effect = itemEffects[itemName];
 
-    if (now - lastTap < DOUBLE_TAP_THRESHOLD) {
-        // SUCCESS: Double Tap Detected
-        // Clear any pending single-tap messages if they exist
-        const existingOverlays = document.querySelectorAll('.overlay:not(#notice-overlay):not(#auth-overlay)');
-        existingOverlays.forEach(el => el.remove());
-        
+    if (now - lastTap < 300) {
+        // DOUBLE TAP -> CONSUME
         consumeItem(itemName);
     } else {
-        // POSSIBLY: Single Tap
-        // We set a timeout so the info doesn't pop up instantly if you're mid-double-tap
+        // SINGLE TAP -> SHOW DEFINITION
+        // We use a small timeout to ensure we aren't about to double tap
         setTimeout(() => {
-            const checkAgain = Date.now();
-            if (checkAgain - lastTap >= DOUBLE_TAP_THRESHOLD) {
+            if (Date.now() - lastTap >= 300) {
                 playSfx('click');
-                showSystemMessage("ITEM INFO", `${itemName}: Double-tap to consume and gain its effects.`);
+                showSystemMessage(
+                    itemName.toUpperCase(), 
+                    `<span style="color:var(--accent)">EFFECT:</span><br>${effect.desc}<br><br><small>[ Double-tap to confirm consumption ]</small>`
+                );
             }
-        }, DOUBLE_TAP_THRESHOLD);
+        }, 305);
     }
-    
     lastTap = now;
 }
     
 function consumeItem(itemName) {
     if (p.cargo[itemName] > 0) {
+        // Clear previous info boxes
+        const overlays = document.querySelectorAll('.overlay:not(#notice-overlay):not(#auth-overlay)');
+        overlays.forEach(el => el.remove());
+
         p.cargo[itemName] -= 1;
-        const resultText = itemEffects[itemName](); 
+        const resultText = itemEffects[itemName].run(); // Calls the 'run' function
+        
         showSystemMessage("ITEM CONSUMED", resultText);
         
-        // Level up check in case the item gave EXP
+        // Level up check
         if (p.exp >= p.level * 100) {
-            p.level++;
-            p.exp = 0;
+            p.level++; p.exp = 0;
+            playSfx('levelUp');
             showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
         }
+        
         save();
         updateUI();
-        render('cargo'); // Refresh the inventory view
+        render('cargo'); 
     }
 }
 
@@ -565,15 +635,38 @@ function consumeItem(itemName) {
 }
 
     function updateUI() {
-        document.getElementById('lvl-display').innerText = p.level.toString().padStart(2, '0');
-        document.getElementById('streak-display').innerText = p.streak;
-        document.getElementById('job-display').innerText = p.job;
-        document.getElementById('rank-display').innerText = "RANK: " + ['E','D','C','B','A','S'][Math.min(Math.floor(p.level/15), 5)];
-        document.getElementById('exp-fill').style.width = (p.exp / (p.level * 100) * 100) + "%";
+    const nextLvlExp = p.level * 100; // Your system's max exp formula
+    
+    // Update numerical displays
+    document.getElementById('lvl-display').innerText = p.level.toString().padStart(2, '0');
+    document.getElementById('streak-display').innerText = p.streak;
+    document.getElementById('job-display').innerText = p.job;
+    
+    // Update Rank based on level
+    const ranks = ['E','D','C','B','A','S'];
+    const rankIndex = Math.min(Math.floor(p.level/15), 5);
+    document.getElementById('rank-display').innerText = "RANK: " + ranks[rankIndex];
+    
+    // Update EXP Bar width
+    const expPercent = (p.exp / nextLvlExp) * 100;
+    document.getElementById('exp-fill').style.width = expPercent + "%";
+    
+    // Update EXP Counter text (Current / Max)
+    document.getElementById('exp-counter').innerText = `${p.exp} / ${nextLvlExp} EXP`;
+
+    const counterEl = document.getElementById('exp-counter');
+    if (expPercent > 80) {
+        counterEl.style.color = "var(--accent)";
+        counterEl.style.textShadow = "0 0 5px var(--accent)";
+    } else {
+        counterEl.style.color = "#555";
+        counterEl.style.textShadow = "none";
     }
+}
 </script>
 </body>
 </html>
+
 
 
 
