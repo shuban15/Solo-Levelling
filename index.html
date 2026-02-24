@@ -184,6 +184,46 @@
             transition: 0.3s;
         }
 
+        /* Update these in your <style> section */
+
+.hunter-name { 
+    font-family: 'JetBrains Mono'; 
+    font-size: 1.1rem; /* Increased from 0.75rem */
+    color: var(--accent); 
+    letter-spacing: 3px; 
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.rank-box { 
+    font-family: 'JetBrains Mono'; 
+    font-size: 0.85rem; /* Increased from 0.6rem */
+    color: #888; /* Slightly lighter for better contrast */
+    letter-spacing: 2px;
+    font-weight: 700;
+}
+
+#job-display {
+    font-size: 0.75rem !important; /* Increased from 0.5rem */
+    color: var(--accent); 
+    opacity: 0.8 !important; /* More visible than 0.5 */
+    letter-spacing: 1px;
+    margin-top: 2px;
+    font-family: 'JetBrains Mono';
+}
+
+.lvl-text { 
+    font-size: 3.2rem; /* Increased from 2.5rem */
+    font-weight: 300; 
+    margin: 10px 0; 
+    line-height: 1;
+}
+
+#lvl-display {
+    font-weight: 700; /* Makes the number stand out */
+}
+
         nav button.active {
             color: var(--accent);
             text-shadow: 0 0 8px var(--accent);
@@ -232,25 +272,21 @@
     </div>
 
     <header id="main-header" class="hidden">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-            <div>
-                <span class="hunter-name" id="disp-name">PLAYER_UNKNOWN</span>
-                <div id="rank-display" class="rank-box">RANK: E</div>
-                <div id="job-display" style="font-size: 0.5rem; color: var(--accent); opacity: 0.5;">UNAWAKENED</div>
-                <div class="lvl-text">LVL <span id="lvl-display">01</span></div>
-            </div>
-            <div style="text-align: right;">
-                <div class="rank-box">STREAK</div>
-                <div style="font-size: 1.2rem; color: var(--accent);" id="streak-display">0</div>
-            </div>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="flex: 1;">
+            <span class="hunter-name" id="disp-name">PLAYER_UNKNOWN</span>
+            <div id="rank-display" class="rank-box">RANK: E</div>
+            <div id="job-display">UNAWAKENED</div>
+            <div class="lvl-text">LVL <span id="lvl-display">01</span></div>
         </div>
-        <div class="exp-bar">
-    <div id="exp-fill" class="exp-fill"></div>
-</div>
-<div id="exp-counter" style="font-family:'JetBrains Mono'; font-size:0.6rem; color:#555; text-align:right; margin-top:5px; letter-spacing:1px;">
-    0 / 100 EXP
-</div>
-    </header>
+        <div style="text-align: right; padding-top: 5px;">
+            <div class="rank-box" style="font-size: 0.6rem; opacity: 0.6;">STREAK</div>
+            <div style="font-size: 1.6rem; color: var(--accent); font-weight: 700;" id="streak-display">0</div>
+        </div>
+    </div>
+    <div class="exp-bar"><div id="exp-fill" class="exp-fill"></div></div>
+    <div id="exp-counter" style="font-family:'JetBrains Mono'; font-size:0.65rem; color:#555; text-align:right; margin-top:5px;">0 / 100 EXP</div>
+</header>
 
     <div id="main-content" class="content hidden"></div>
 
@@ -666,6 +702,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
