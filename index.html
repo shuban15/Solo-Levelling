@@ -44,6 +44,20 @@
             display: flex;
             flex-direction: column;
         }
+        @keyframes glitch-shake {
+            0% { transform: translate(0); }
+            20% { transform: translate(-5px, 5px); }
+            40% { transform: translate(-5px, -5px); }
+            60% { transform: translate(5px, 5px); }
+            80% { transform: translate(5px, -5px); }
+            100% { transform: translate(0); }
+        }
+
+.system-glitch {
+    animation: glitch-shake 0.3s infinite;
+    filter: hue-rotate(90deg) contrast(1.5);
+    background-color: rgba(0, 212, 255, 0.1) !important;
+}
 
         /* Cinematic Overlays */
         .overlay {
@@ -298,25 +312,30 @@
 </div>
 
 <script>
-    const sounds = {
-    // Sharp electronic chime for notifications
-    ping: new Audio('https://assets.mixkit.co/active_storage/sfx/2861/2861-preview.mp3'),
-    // Level up "Shimmer"
-    levelUp: new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3'),
-    // Low mechanical click for UI interaction
-    click: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'),
-    // Error/Penalty sound
-    alert: new Audio('https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'),
-    // Digital "glitch" for Surprise Quests
-    surprise: new Audio('https://assets.mixkit.co/active_storage/sfx/1003/1003-preview.mp3')
+    // --- UPDATED SYSTEM SOUNDS ---
+const sounds = {
+    // Sharp digital "Chime" for standard notifications
+    ping: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/system-notification.mp3'), 
+    
+    // Heavy electronic "Thud/Level Up"
+    levelUp: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/level-up.mp3'),
+    
+    // Quick "Blade/Woosh" sound for menu clicks
+    click: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/ui-click.mp3'),
+    
+    // Glitchy "Danger" sound for Surprise Quests/Alerts
+    alert: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/system-alert.mp3'),
+    
+    // High-pitched "Crystal" sound for item consumption
+    consume: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/item-use.mp3')
 };
 
-// Function to play sounds with a slight volume adjustment
 function playSfx(type) {
     if (sounds[type]) {
-        sounds[type].currentTime = 0; // Reset to start
-        sounds[type].volume = 0.4;    // Set to 40% volume
-        sounds[type].play().catch(e => console.log("Audio blocked: tap screen first"));
+        const sfx = sounds[type];
+        sfx.currentTime = 0; 
+        sfx.volume = 0.5; // Slightly louder for impact
+        sfx.play().catch(e => console.warn("Interaction required for audio."));
     }
 }
     // --- FIREBASE CONFIG ---
@@ -400,42 +419,71 @@ function playSfx(type) {
     }
 
     // --- MISSIONS ---
-    function generateQuests() {
-        const d = 10 + (p.level * 2);
-        const pool = [
-            { s: 'STR', n: 'Push-ups', r: d },
-            { s: 'STR', n: 'Squats', r: d * 2 },
-            { s: 'STR', n: 'Jumping Squats', r: d * 2 },
-            { s: 'STR', n: 'Pull-ups', r: d * 2 },
-            { s: 'STR', n: 'Sit-ups', r: d * 2 },
-            { s: 'STR', n: 'Lunges', r: d * 2 },
-            { s: 'STR', n: 'Crunches', r: d * 2 },
-            { s: 'STR', n: 'Dips', r: d * 2 },
-            { s: 'AGI', n: 'Burpees', r: Math.floor(d/2) },
-            { s: 'AGI', n: 'High Knees', r: Math.floor(d/2) },
-            { s: 'AGI', n: 'Standing Run', r: Math.floor(d/2) },
-            { s: 'AGI', n: 'High jumps', r: Math.floor(d/2) },
-            { s: 'AGI', n: 'Jump rope', r: Math.floor(d/2) },
-            { s: 'AGI', n: 'Split jumps', r: Math.floor(d/2) },
-            { s: 'VIT', n: 'Cold Shower', r: '3 Minutes' },
-            { s: 'VIT', n: 'Fast walk', r: '3 Minutes' },
-            { s: 'VIT', n: 'Running/Cycling', r: '5KM' },
-            { s: 'VIT', n: 'Shadow Box', r: '3 Minutes' },
-            { s: 'INT', n: 'Deep Work', r: '40 Minutes' },
-            { s: 'INT', n: 'Play Chess', r: '40 Minutes' },
-            { s: 'INT', n: 'Learn new skill', r: '40 Minutes' },
-            { s: 'INT', n: 'Study', r: '40 Minutes' },
-            { s: 'INT', n: 'Knowledge', r: '40 Minutes' },
-            { s: 'FOC', n: 'No Phone', r: '1 Hour' },
-            { s: 'FOC', n: 'Meditate', r: '30 Minutes' },
-            { s: 'FOC', n: 'Box Breathing', r: '5 Minutes' },
-            { s: 'FOC', n: 'Thinking', r: '30 Minutes' },
-            { s: 'FOC', n: 'Book Reading', r: '30 Minutes' },
-            { s: 'FOC', n: 'Write about your day', r: '10 Minutes' }
+function generateQuests() {
+    // 1. Calculate the Scaling Difficulty
+    const d = 10 + (p.level * 2);
+
+    // 2. Define the Pool
+    const pool = [
+        { s: 'STR', n: 'Push-ups', r: d },
+        { s: 'STR', n: 'Squats', r: d * 2 },
+        { s: 'STR', n: 'Jumping Squats', r: d * 2 },
+        { s: 'STR', n: 'Pull-ups', r: d * 2 },
+        { s: 'STR', n: 'Sit-ups', r: d * 2 },
+        { s: 'STR', n: 'Lunges', r: d * 2 },
+        { s: 'STR', n: 'Crunches', r: d * 2 },
+        { s: 'STR', n: 'Dips', r: d * 2 },
+        { s: 'AGI', n: 'Burpees', r: Math.floor(d/2) },
+        { s: 'AGI', n: 'High Knees', r: Math.floor(d/2) },
+        { s: 'AGI', n: 'Standing Run', r: Math.floor(d/2) },
+        { s: 'AGI', n: 'High jumps', r: Math.floor(d/2) },
+        { s: 'AGI', n: 'Jump rope', r: Math.floor(d/2) },
+        { s: 'AGI', n: 'Split jumps', r: Math.floor(d/2) },
+        { s: 'VIT', n: 'Cold Shower', r: '3 Minutes' },
+        { s: 'VIT', n: 'Fast walk', r: '3 Minutes' },
+        { s: 'VIT', n: 'Running/Cycling', r: '5KM' },
+        { s: 'VIT', n: 'Shadow Box', r: '3 Minutes' },
+        { s: 'INT', n: 'Deep Work', r: '40 Minutes' },
+        { s: 'INT', n: 'Play Chess', r: '40 Minutes' },
+        { s: 'INT', n: 'Learn new skill', r: '40 Minutes' },
+        { s: 'INT', n: 'Study', r: '40 Minutes' },
+        { s: 'INT', n: 'Knowledge', r: '40 Minutes' },
+        { s: 'FOC', n: 'No Phone', r: '1 Hour' },
+        { s: 'FOC', n: 'Meditate', r: '30 Minutes' },
+        { s: 'FOC', n: 'Box Breathing', r: '5 Minutes' },
+        { s: 'FOC', n: 'Thinking', r: '30 Minutes' },
+        { s: 'FOC', n: 'Book Reading', r: '30 Minutes' },
+        { s: 'FOC', n: 'Write about your day', r: '10 Minutes' }
+    ];
+
+    // 3. Shuffle and Select 5 Regular Missions
+    let selectedMissions = pool
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 5)
+        .map((q, i) => ({ ...q, id: i, done: false, isSurprise: false }));
+
+    // 4. Inject Surprise Quest (Level 10-15 Only)
+    if (p.level >= 10 && p.level <= 15) {
+        const surprisePool = [
+            { s: 'STR', n: 'SURPRISE: Limit Breaker', r: '60 Push-ups' },
+            { s: 'VIT', n: 'SURPRISE: Iron Body', r: '5 Min Cold Shower' },
+            { s: 'AGI', n: 'SURPRISE: Shadow Step', r: '3KM Run' }
         ];
-        p.missions = pool.sort(() => 0.5 - Math.random()).slice(0, 5).map((q, i) => ({ ...q, id: i, done: false }));
-        save();
+        
+        const randomSQ = surprisePool[Math.floor(Math.random() * surprisePool.length)];
+        
+        selectedMissions.push({
+            ...randomSQ,
+            id: 'sq_99',
+            done: false,
+            isSurprise: true
+        });
     }
+
+    // 5. Save all at once to prevent UI glitches
+    p.missions = selectedMissions;
+    save();
+}
 
     // Step 1: The Trigger (Asks the player)
 function completeMission(id) {
@@ -460,37 +508,96 @@ function completeMission(id) {
     `;
     document.body.appendChild(confirmOverlay);
 }
+    
+function checkDailyCompletion() {
+    const regularMissions = p.missions.filter(m => !m.isSurprise);
+    const surpriseMission = p.missions.find(m => m.isSurprise);
+
+    const regularDone = regularMissions.every(m => m.done);
+
+    if (regularDone) {
+        // If regular quests are done but a Surprise Quest exists and is NOT done
+        if (surpriseMission && !surpriseMission.done) {
+            p.exp = Math.max(0, p.exp - 30); // Deduct 30 EXP
+            playSfx('alert');
+            showSystemMessage("PENALTY APPLIED", "Regular quests cleared, but Surprise Quest was ignored. <br><br>-30 EXP deducted.");
+        } else {
+            // Standard rewards for full completion
+            p.streak++;
+            showSystemMessage("QUEST CLEAR", "All missions completed successfully.");
+        }
+        save();
+        updateUI();
+    }
+}
 
 // Step 2: The Execution (Gives rewards)
 function executeMission(id) {
-    // Remove the confirmation box
-    document.getElementById('confirm-overlay').remove();
+    // 1. Remove the confirmation box
+    const confirmOverlay = document.getElementById('confirm-overlay');
+    if (confirmOverlay) confirmOverlay.remove();
     
-    // Mark as done
+    // 2. Mark as done and grant base rewards
     p.missions[id].done = true;
     p.stats[p.missions[id].s]++;
     p.exp += 20;
 
-    // Check for Surprise Quest (10% chance)
-    if (Math.random() < 0.10) { 
-        triggerSurpriseQuest(); 
+    // 3. Penalty Check (Lv. 10-15 Logic)
+    // If the mission completed was a REGULAR quest, check if we should punish for ignoring the Surprise Quest
+    const surpriseQuest = p.missions.find(m => m.isSurprise);
+    const regularMissions = p.missions.filter(m => !m.isSurprise);
+    const allRegularsDone = regularMissions.every(m => m.done);
+
+    if (p.level >= 10 && p.level <= 15 && allRegularsDone && surpriseQuest && !surpriseQuest.done) {
+        p.exp = Math.max(0, p.exp - 30);
+        playSfx('alert');
+        showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
     }
 
-    // Daily Clear Reward
+    // 4. Daily Clear Reward
     if (p.missions.every(m => m.done)) {
         p.streak++;
         const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
-        const r = rewards[Math.floor(Math.random()*rewards.length)];
+        const r = rewards[Math.floor(Math.random() * rewards.length)];
         p.cargo[r] = (p.cargo[r] || 0) + 1;
         showSystemMessage("QUEST CLEAR", `Reward: ${r} acquired.`);
     }
 
-    // Level Up Check
+    // 5. Level Up Check & Milestones
     if (p.exp >= p.level * 100) {
         p.level++;
         p.exp = 0;
-        playSfx('levelUp');
-        showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
+
+        // --- LEVEL 5 MILESTONE ---
+        if (p.level === 5) {
+            playSfx('levelUp');
+            const bonuses = ["Blessed Box", "Rest Protocol", "Focus Token"];
+            bonuses.forEach(item => { p.cargo[item] = (p.cargo[item] || 0) + 1; });
+            
+            showSystemMessage("MILESTONE 5", 
+                `Level 5 reached. System Bonus granted:<br><br>` +
+                `<small>+1 Blessed Box, +1 Rest Protocol, +1 Focus Token</small>`
+            );
+        } 
+        // --- LEVEL 10 MILESTONE (Glitch & Surprise Unlock) ---
+        else if (p.level === 10) {
+            document.body.classList.add('system-glitch');
+            playSfx('alert');
+            
+            setTimeout(() => {
+                document.body.classList.remove('system-glitch');
+                showSystemMessage("SYSTEM OVERRIDE", 
+                    `<span style="color:var(--accent); font-weight:bold;">LEVEL 10: SURPRISE QUESTS UNLOCKED.</span><br><br>` +
+                    `Hidden Growth protocol active from Lv. 10 to Lv. 15.<br>` +
+                    `<span style="color:var(--danger)">WARNING:</span> Leaving Surprise Quests incomplete results in -30 EXP penalty.`
+                );
+            }, 1000);
+        } 
+        // --- STANDARD LEVEL UP ---
+        else {
+            playSfx('levelUp');
+            showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
+        }
     }
 
     save(); 
@@ -532,6 +639,7 @@ function handleItemInteraction(itemName) {
     if (now - lastTap < 300) {
         // DOUBLE TAP -> CONSUME
         consumeItem(itemName);
+        playSfx('consume');
     } else {
         // SINGLE TAP -> SHOW DEFINITION
         // We use a small timeout to ensure we aren't about to double tap
@@ -702,6 +810,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
