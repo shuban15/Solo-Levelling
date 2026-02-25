@@ -533,17 +533,22 @@ function checkDailyCompletion() {
 
 // Step 2: The Execution (Gives rewards)
 function executeMission(id) {
-    // 1. Remove the confirmation box
     const confirmOverlay = document.getElementById('confirm-overlay');
     if (confirmOverlay) confirmOverlay.remove();
     
-    // 2. Mark as done and grant base rewards
-    p.missions[id].done = true;
-    p.stats[p.missions[id].s]++;
-    p.exp += 20;
+    // --- 1. DYNAMIC EXP REWARD ---
+    let mission = p.missions[id] || p.missions.find(m => m.id === id);
+    let expGain = 10; // Base for INT/FOC/VIT
 
-    // 3. Penalty Check (Lv. 10-15 Logic)
-    // If the mission completed was a REGULAR quest, check if we should punish for ignoring the Surprise Quest
+    if (mission.s === 'STR' || mission.s === 'AGI') expGain = 15; // Physical bonus
+    if (mission.isSurprise) expGain = 30; // Surprise quest bonus
+    
+    // Apply rewards
+    mission.done = true;
+    p.stats[mission.s]++;
+    p.exp += expGain;
+
+    // --- 2. PENALTY CHECK (Lv. 10-15 Logic) ---
     const surpriseQuest = p.missions.find(m => m.isSurprise);
     const regularMissions = p.missions.filter(m => !m.isSurprise);
     const allRegularsDone = regularMissions.every(m => m.done);
@@ -554,7 +559,7 @@ function executeMission(id) {
         showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
     }
 
-    // 4. Daily Clear Reward
+    // --- 3. DAILY CLEAR REWARD ---
     if (p.missions.every(m => m.done)) {
         p.streak++;
         const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
@@ -563,37 +568,29 @@ function executeMission(id) {
         showSystemMessage("QUEST CLEAR", `Reward: ${r} acquired.`);
     }
 
-    // 5. Level Up Check & Milestones
-    if (p.exp >= p.level * 100) {
-        p.level++;
-        p.exp = 0;
+    // --- 4. LEVEL UP CHECK (OVERFLOW + SCALING) ---
+    // Formula: Every level requires 100 + (Level * 5)
+    let nextLevelGoal = 100 + (p.level * 5);
 
-        // --- LEVEL 5 MILESTONE ---
+    while (p.exp >= nextLevelGoal) {
+        p.exp -= nextLevelGoal; // Subtract cost (Overflow balance carried over)
+        p.level++;
+        nextLevelGoal = 100 + (p.level * 5); // Update goal for next level check
+
         if (p.level === 5) {
             playSfx('levelUp');
             const bonuses = ["Blessed Box", "Rest Protocol", "Focus Token"];
             bonuses.forEach(item => { p.cargo[item] = (p.cargo[item] || 0) + 1; });
-            
-            showSystemMessage("MILESTONE 5", 
-                `Level 5 reached. System Bonus granted:<br><br>` +
-                `<small>+1 Blessed Box, +1 Rest Protocol, +1 Focus Token</small>`
-            );
+            showSystemMessage("MILESTONE 5", `Level 5 reached. Bonus rewards granted.`);
         } 
-        // --- LEVEL 10 MILESTONE (Glitch & Surprise Unlock) ---
         else if (p.level === 10) {
             document.body.classList.add('system-glitch');
             playSfx('alert');
-            
             setTimeout(() => {
                 document.body.classList.remove('system-glitch');
-                showSystemMessage("SYSTEM OVERRIDE", 
-                    `<span style="color:var(--accent); font-weight:bold;">LEVEL 10: SURPRISE QUESTS UNLOCKED.</span><br><br>` +
-                    `Hidden Growth protocol active from Lv. 10 to Lv. 15.<br>` +
-                    `<span style="color:var(--danger)">WARNING:</span> Leaving Surprise Quests incomplete results in -30 EXP penalty.`
-                );
+                showSystemMessage("SYSTEM OVERRIDE", `LEVEL 10: SURPRISE QUESTS UNLOCKED. Penalty active.`);
             }, 1000);
         } 
-        // --- STANDARD LEVEL UP ---
         else {
             playSfx('levelUp');
             showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
@@ -810,6 +807,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
