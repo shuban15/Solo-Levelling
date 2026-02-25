@@ -560,12 +560,33 @@ function executeMission(id) {
     }
 
     // --- 3. DAILY CLEAR REWARD ---
+    // --- 3. DAILY CLEAR REWARD ---
+    // --- 3. DAILY CLEAR REWARD ---
     if (p.missions.every(m => m.done)) {
         p.streak++;
-        const rewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
-        const r = rewards[Math.floor(Math.random() * rewards.length)];
+        
+        // Define reward tiers
+        const commonRewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
+        const rareRewards = ["Shadow Essence", "Warrior's Spirit", "Scholar's Scroll", "Elixir of Life"];
+        const legendaryRewards = ["System Key", "Elixir of Greatness"]; // Greatness = +5 to ALL stats
+
+        let pool = [...commonRewards];
+        
+        // At Level 20+, Rare items enter the pool
+        if (p.level >= 20) pool.push(...rareRewards);
+        
+        // At Level 30+, the System Key (Legendary) has a chance to drop
+        if (p.level >= 30) pool.push(...legendaryRewards);
+
+        const r = pool[Math.floor(Math.random() * pool.length)];
         p.cargo[r] = (p.cargo[r] || 0) + 1;
-        showSystemMessage("QUEST CLEAR", `Reward: ${r} acquired.`);
+        
+        // Display with rarity coloring
+        let color = "var(--accent)";
+        if (rareRewards.includes(r)) color = "#00ff95"; // Rare Green
+        if (legendaryRewards.includes(r)) color = "#ffaa00"; // Legendary Gold
+
+        showSystemMessage("QUEST CLEAR", `Daily tasks finalized. <br>Received: <span style="color:${color}">${r}</span>`);
     }
 
     // --- 4. LEVEL UP CHECK (OVERFLOW + SCALING) ---
@@ -602,31 +623,25 @@ function executeMission(id) {
     render('mission');
 }
     const itemEffects = {
-    "Rest Protocol": {
-        desc: "Increases Vitality (VIT) by 5. Restores physical fatigue.",
-        run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }
-    },
-    "Dopamine Hit": {
-        desc: "Grants an immediate 15 EXP boost to speed up leveling.",
-        run: () => { p.exp += 15; return "EXP increased by 15."; }
-    },
-    "Focus Token": {
-        desc: "Increases Focus (FOC) by 5. Enhances mental clarity.",
-        run: () => { p.stats.FOC += 5; return "FOC increased by 5."; }
-    },
-    "Physical Restoration": {
-        desc: "Increases Strength (STR) and Agility (AGI) by 2 each.",
-        run: () => { p.stats.STR += 2; p.stats.AGI += 2; return "Physical stats restored."; }
-    },
-    "Blessed Box": {
-        desc: "A random blessing. Grants +5 to a random stat.",
-        run: () => { 
-            const keys = Object.keys(p.stats);
-            const randomStat = keys[Math.floor(Math.random() * keys.length)];
-            p.stats[randomStat] += 5;
-            return `Blessed! ${randomStat} increased by 5.`;
-        }
-    }
+    "Rest Protocol": { desc: "Increases Vitality (VIT) by 5. Purple Grade.", run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }},
+    "Dopamine Hit": { desc: "Grants 15 EXP. Purple Grade.", run: () => { p.exp += 15; return "EXP increased by 15."; }},
+    "Focus Token": { desc: "Increases Focus (FOC) by 5. Purple Grade.", run: () => { p.stats.FOC += 5; return "FOC increased by 5."; }},
+    "Physical Restoration": { desc: "Increases STR and AGI by 2. Purple Grade.", run: () => { p.stats.STR += 2; p.stats.AGI += 2; return "Physical stats restored."; }},
+    "Blessed Box": { desc: "Random +5 to any stat. Purple Grade.", run: () => { 
+        const keys = Object.keys(p.stats); const s = keys[Math.floor(Math.random()*keys.length)];
+        p.stats[s] += 5; return `Blessed! ${s} increased by 5.`; 
+    }},
+    "Shadow Essence": { desc: "Rare: AGI +5. Green Grade.", run: () => { p.stats.AGI += 5; return "AGI +5."; }},
+    "Warrior's Spirit": { desc: "Rare: STR +5. Green Grade.", run: () => { p.stats.STR += 5; return "STR +5."; }},
+    "Scholar's Scroll": { desc: "Rare: INT +5. Green Grade.", run: () => { p.stats.INT += 5; return "INT +5."; }},
+    "Elixir of Life": { desc: "Rare: Grants 50 EXP. Green Grade.", run: () => { p.exp += 50; return "EXP +50."; }},
+    "Elixir of Greatness": { desc: "Legendary: ALL STATS +5. Gold Grade.", run: () => { 
+        Object.keys(p.stats).forEach(k => p.stats[k] += 5); return "All stats increased by 5."; 
+    }},
+    "System Key": { desc: "Legendary: Required for Job Change. [LVL 40]. Gold Grade", run: () => { 
+        if (p.level < 40) { p.cargo["System Key"]++; return "ACCESS DENIED: Insufficient Level."; }
+        p.job = "TRIAL IN PROGRESS"; return "JOB CHANGE PROTOCOL INITIATED.";
+    }}
 };
 
 function handleItemInteraction(itemName) {
@@ -679,45 +694,49 @@ function consumeItem(itemName) {
 
     // --- TAB RENDERING ---
     function render(tab) {
-        const cont = document.getElementById('main-content');
-        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-        document.getElementById('nav-' + tab).classList.add('active');
-        if (timerId) clearInterval(timerId);
+    const cont = document.getElementById('main-content');
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-' + tab).classList.add('active');
+    if (timerId) clearInterval(timerId);
 
-        if (tab === 'status') {
-            cont.innerHTML = `
-                <div class="chart-wrap"><canvas id="statsChart"></canvas></div>
-                <div>` + Object.entries(p.stats).map(([k,v]) => `
-                <div style="display:flex; justify-content:space-between; padding:15px 0; border-bottom:1px solid #111; font-family:'JetBrains Mono'; font-size:0.85rem;">
-                    <span style="color:#555;">${k}</span><span>${v}</span>
-                </div>`).join('') + `</div>`;
-            initChart();
-        } else if (tab === 'mission') {
-            cont.innerHTML = `<div id="timer">00:00:00</div>` + p.missions.map(m => `
-                <div class="quest-card ${m.done ? 'done' : ''}" onclick="completeMission(${m.id})">
-                    <div><span class="quest-req">${m.s}</span><br><span class="quest-title">${m.n}</span></div>
-                    <div class="quest-req">REQ: ${m.r}</div>
-                </div>`).join('');
-            timerId = setInterval(updateTimer, 1000); updateTimer();
-        } else if (tab === 'cargo') {
-    const hasItems = Object.entries(p.cargo).some(([name, count]) => count > 0);
-    
-    if (!hasItems) {
-        cont.innerHTML = `<div style="text-align:center; padding-top:50px; color:#444; font-family:'JetBrains Mono'; font-size:0.7rem;">INVENTORY EMPTY</div>`;
-        return;
+    if (tab === 'status') {
+        const statColors = { STR: '#ff3e3e', AGI: '#00ff95', VIT: '#ffaa00', INT: '#bf00ff', FOC: '#00d4ff' };
+        cont.innerHTML = `<div class="chart-wrap"><canvas id="statsChart"></canvas></div>` + 
+            Object.entries(p.stats).map(([k,v]) => `
+            <div style="display:flex; justify-content:space-between; padding:15px; border-bottom:1px solid #111; font-family:'JetBrains Mono';">
+                <span style="color:#777;">${k}</span>
+                <span style="color:${statColors[k]}; font-weight:bold; text-shadow: 0 0 5px ${statColors[k]}55;">${v.toString().padStart(2,'0')}</span>
+            </div>`).join('');
+        initChart();
+    } else if (tab === 'mission') {
+        cont.innerHTML = `<div id="timer">00:00:00</div>` + p.missions.map(m => `
+            <div class="quest-card ${m.done ? 'done' : ''}" onclick="completeMission('${m.id}')">
+                <div><span class="quest-req">${m.s}</span><br><span class="quest-title">${m.n}</span></div>
+                <div class="quest-req">REQ: ${m.r}</div>
+            </div>`).join('');
+        timerId = setInterval(updateTimer, 1000); updateTimer();
+    } else if (tab === 'cargo') {
+        const hasItems = Object.entries(p.cargo).some(([n, c]) => c > 0);
+        if (!hasItems) { cont.innerHTML = `<div style="text-align:center; padding:50px; color:#444;">INVENTORY EMPTY</div>`; return; }
+
+        cont.innerHTML = `<div style="color:#bf00ff; font-size:0.6rem; text-align:center; margin-bottom:15px;">[ DOUBLE-TAP TO USE ]</div>` +
+            Object.entries(p.cargo).map(([name, count]) => {
+                if (count <= 0) return '';
+                let color = '#bf00ff'; // Purple
+                if (name === 'System Key' || name === 'Elixir of Greatness') color = '#ffaa00'; // Gold
+                else if (["Shadow Essence", "Warrior's Spirit", "Scholar's Scroll", "Elixir of Life"].includes(name)) color = '#00ff95'; // Green
+
+                return `
+                <div class="quest-card" onclick="handleItemInteraction('${name}')" style="border-color:${color}; box-shadow: 0 0 10px ${color}33;">
+                    <div>
+                        <span class="quest-title" style="color:${color}">${name}</span>
+                        <div style="font-size:0.5rem; color:#555; margin-top:4px;">${color==='#ffaa00'?'ARTIFACT':'SYSTEM REWARD'}</div>
+                    </div>
+                    <span style="color:${color}; font-size:1.2rem; font-family:'JetBrains Mono';">x${count}</span>
+                </div>`;
+            }).join('');
     }
-
-    cont.innerHTML = `<div style="font-family:'JetBrains Mono'; font-size:0.6rem; color:var(--accent); margin-bottom:15px; letter-spacing:1px;">[ DOUBLE-TAP TO USE ITEM ]</div>` + 
-        Object.entries(p.cargo).map(([name, count]) => count > 0 ? `
-            <div class="quest-card" onclick="handleItemInteraction('${name}')" style="cursor:pointer;">
-                <div>
-                    <span class="quest-title">${name}</span>
-                    <div style="font-size:0.55rem; color:#555; margin-top:4px; font-family:'JetBrains Mono';">CONSUMABLE ITEM</div>
-                </div>
-                <span style="color:var(--accent); font-family:'JetBrains Mono'; font-size:1.2rem;">x${count}</span>
-            </div>` : '').join('');
 }
-    }
 
     function initChart() {
         const ctx = document.getElementById('statsChart').getContext('2d');
@@ -807,6 +826,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
