@@ -776,7 +776,7 @@ function consumeItem(itemName) {
 }
 
     function updateUI() {
-    const nextLvlExp = p.level * 100; // Your system's max exp formula
+    const nextLvlExp = 100 + (p.level * 5);; // Your system's max exp formula
     
     // Update numerical displays
     document.getElementById('lvl-display').innerText = p.level.toString().padStart(2, '0');
@@ -807,6 +807,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
