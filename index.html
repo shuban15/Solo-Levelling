@@ -198,6 +198,63 @@
             transition: 0.3s;
         }
 
+        /* Leaderboard Styling */
+.lb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.lb-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.lb-item.is-me {
+    border-color: var(--accent);
+    background: rgba(0, 212, 255, 0.05);
+}
+
+.lb-rank {
+    font-family: 'JetBrains Mono';
+    font-size: 1.2rem;
+    font-weight: 700;
+    width: 45px;
+    color: #444;
+}
+
+.lb-info { flex: 1; }
+.lb-info .name { 
+    display: block; 
+    font-size: 0.85rem; 
+    text-transform: uppercase; 
+    letter-spacing: 1px; 
+}
+
+.lb-info .job { 
+    font-size: 0.6rem; 
+    color: var(--accent); 
+    opacity: 0.7; 
+}
+
+.lb-level {
+    font-family: 'JetBrains Mono';
+    font-weight: bold;
+    color: var(--accent);
+}
+
+/* Top 3 Glow */
+.lb-item:nth-child(1) .lb-rank { color: #FFD700; text-shadow: 0 0 10px #FFD70055; }
+.lb-item:nth-child(2) .lb-rank { color: #C0C0C0; }
+.lb-item:nth-child(3) .lb-rank { color: #CD7F32; }
+
         /* Update these in your <style> section */
 
 .hunter-name { 
@@ -305,10 +362,11 @@
     <div id="main-content" class="content hidden"></div>
 
     <nav id="main-nav" class="hidden">
-        <button onclick="render('status')" id="nav-status">STATUS</button>
-        <button onclick="render('mission')" id="nav-mission">QUESTS</button>
-        <button onclick="render('cargo')" id="nav-cargo">INVENTORY</button>
-    </nav>
+    <button onclick="render('status')" id="nav-status">STATUS</button>
+    <button onclick="render('mission')" id="nav-mission">QUESTS</button>
+    <button onclick="render('ranking')" id="nav-ranking">RANKING</button> 
+    <button onclick="render('cargo')" id="nav-cargo">INVENTORY</button>
+</nav>
 </div>
 
 <script>
@@ -736,6 +794,18 @@ function consumeItem(itemName) {
                 </div>`;
             }).join('');
     }
+        // Add this inside your existing render(tab) function
+      else if (tab === 'ranking') {
+        cont.innerHTML = `
+            <div style="text-align:center; color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem; margin-bottom:20px;">
+                [ GLOBAL HUNTER RANKINGS ]
+            </div>
+            <div id="leaderboard-display" class="lb-list">
+                <div style="text-align:center; padding:40px; color:#444;">SYNCING DATA...</div>
+            </div>
+        `;
+        fetchLeaderboard();
+    }
 }
 
     function initChart() {
@@ -823,9 +893,44 @@ function consumeItem(itemName) {
         counterEl.style.textShadow = "none";
     }
 }
+    function fetchLeaderboard() {
+    const lbDisplay = document.getElementById('leaderboard-display');
+    
+    // Querying 'hunters' collection by Level (Highest to Lowest)
+    db.collection('hunters')
+      .orderBy('level', 'desc')
+      .limit(20)
+      .onSnapshot(snapshot => {
+          if (!document.getElementById('leaderboard-display')) return; // Exit if user switched tabs
+          
+          lbDisplay.innerHTML = "";
+          
+          snapshot.docs.forEach((doc, index) => {
+              const data = doc.data();
+              const isMe = auth.currentUser && auth.currentUser.uid === doc.id;
+              const rank = index + 1;
+
+              const item = document.createElement('div');
+              item.className = `lb-item ${isMe ? 'is-me' : ''}`;
+              item.innerHTML = `
+                  <div class="lb-rank">${rank.toString().padStart(2, '0')}</div>
+                  <div class="lb-info">
+                      <span class="name">${data.name || "UNKNOWN"} ${isMe ? '(YOU)' : ''}</span>
+                      <span class="job">${data.job || "UNAWAKENED"}</span>
+                  </div>
+                  <div class="lb-level">LVL ${data.level}</div>
+              `;
+              lbDisplay.appendChild(item);
+          });
+      }, error => {
+          console.error("Leaderboard Error:", error);
+          lbDisplay.innerHTML = `<div style="color:var(--danger); font-size:0.7rem;">FAILED TO SYNC RANKINGS. CHECK INDEXES.</div>`;
+      });
+}
 </script>
 </body>
 </html>
+
 
 
 
