@@ -539,11 +539,18 @@ function playSfx(type) {
 
     function checkSystemDay() {
     const today = new Date().toDateString();
+    
+    // Check if the date has changed
     if (p.lastUpdate !== today) {
         const incomplete = p.missions.some(m => !m.done);
         
+        // IMPORTANT: Hide the initial loader before showing the failure screen
+        const initLoader = document.getElementById('init-loader'); 
+        if (initLoader) initLoader.style.display = 'none';
+
         if (incomplete) {
-            triggerQuestFailure(); // Show the cool animation instead of a boring alert
+            triggerQuestFailure(); 
+            return; // Stop here so it doesn't try to run normal boot logic
         } else {
             p.lastUpdate = today;
             generateQuests();
@@ -700,37 +707,22 @@ function checkDailyCompletion() {
 
 // Step 2: The Execution (Gives rewards)
 function executeMission(id) {
+    // Remove the confirmation popup
     const confirmOverlay = document.getElementById('confirm-overlay');
     if (confirmOverlay) confirmOverlay.remove();
     
-    // Correctly find the mission in the array
+    // Find mission
     let mission = p.missions.find(m => m.id == id);
-    if (!mission || mission.done) return; // Prevent double-completing
+    if (!mission || mission.done) return;
 
-    let expGain = 10;
-    
-    // --- 1. DYNAMIC EXP REWARD ---
-    let mission = p.missions[id] || p.missions.find(m => m.id === id);
-    let expGain = 10; // Base for INT/FOC/VIT
-
-    if (mission.s === 'STR' || mission.s === 'AGI') expGain = 15; // Physical bonus
-    if (mission.isSurprise) expGain = 30; // Surprise quest bonus
-    
-    // Apply rewards
+    // Mark as done and give rewards
     mission.done = true;
-    p.stats[mission.s]++;
-    p.exp += expGain;
-
-    // --- 2. PENALTY CHECK (Lv. 10-15 Logic) ---
-    const surpriseQuest = p.missions.find(m => m.isSurprise);
-    const regularMissions = p.missions.filter(m => !m.isSurprise);
-    const allRegularsDone = regularMissions.every(m => m.done);
-
-    if (p.level >= 10 && p.level <= 15 && allRegularsDone && surpriseQuest && !surpriseQuest.done) {
-        p.exp = Math.max(0, p.exp - 30);
-        playSfx('alert');
-        showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
-    }
+    gainExp(10); // Or whatever your exp amount is
+    
+    save();
+    renderMissions(); // Refresh the list
+    showNotice("MISSION COMPLETE");
+}
 
     // --- 3. DAILY CLEAR REWARD ---
     // --- 3. DAILY CLEAR REWARD ---
@@ -796,6 +788,9 @@ function executeMission(id) {
     render('mission');
 }
     function triggerQuestFailure() {
+        // This force-hides any existing "Initializing" screens
+    document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
+    
     playSfx('alert');
     
     // 1. Create the Failure Overlay
@@ -1104,6 +1099,7 @@ function closeProfile() {
 </script>
 </body>
 </html>
+
 
 
 
