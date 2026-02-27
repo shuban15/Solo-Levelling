@@ -507,62 +507,75 @@ function playSfx(type) {
 
     // --- DATA SYNC ---
     async function syncHunter(user) {
-        const docRef = db.collection('hunters').doc(user.uid);
-        const doc = await docRef.get();
+    const docRef = db.collection('hunters').doc(user.uid);
+    const doc = await docRef.get();
 
-        if (doc.exists) {
-            p = doc.data();
-            // We check the day AFTER we have the data, but BEFORE the boot
-            checkSystemDay(); 
-        } else {
-            p = {
-                name: user.displayName, level: 1, exp: 0, streak: 0, job: "UNAWAKENED",
-                stats: { STR: 10, AGI: 10, VIT: 10, INT: 10, FOC: 10 },
-                cargo: {}, missions: [], lastUpdate: new Date().toDateString()
-            };
-            await docRef.set(p);
-            boot(); // New users go straight to boot
-        }
+    if (doc.exists) {
+        p = doc.data();
+        // Check for new day before showing the UI
+        checkSystemDay(); 
+    } else {
+        // New Player Initialization
+        p = {
+            name: user.displayName || "HUNTER", 
+            level: 1, 
+            exp: 0, 
+            streak: 0, 
+            job: "UNAWAKENED",
+            stats: { STR: 10, AGI: 10, VIT: 10, INT: 10, FOC: 10 },
+            cargo: {}, 
+            missions: [], 
+            lastUpdate: new Date().toDateString()
+        };
+        await docRef.set(p);
+        boot(); 
     }
-
+}
     function boot() {
-        // Clear all overlays
-        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        
-        // Show main UI
-        document.getElementById('main-header').classList.remove('hidden');
-        document.getElementById('main-nav').classList.remove('hidden');
-        document.getElementById('main-content').classList.remove('hidden');
-        
-        document.getElementById('disp-name').innerText = p.name.toUpperCase();
-        
-        if (!p.missions || p.missions.length === 0) generateQuests();
-        
-        updateUI();
-        render('status');
-    }
+    if (!p) return; // Hard safety stop
+
+    // 1. Hide ALL overlays
+    document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+    
+    // 2. Reveal UI
+    document.getElementById('main-header').classList.remove('hidden');
+    document.getElementById('main-nav').classList.remove('hidden');
+    document.getElementById('main-content').classList.remove('hidden');
+    
+    // 3. Set Name
+    const nameDisplay = document.getElementById('disp-name');
+    if (nameDisplay) nameDisplay.innerText = p.name.toUpperCase();
+    
+    // 4. Ensure quests exist
+    if (!p.missions || p.missions.length === 0) generateQuests();
+    
+    // 5. Final UI Update
+    updateUI();
+    render('status'); 
+}
 
     function checkSystemDay() {
-        const today = new Date().toDateString();
+    const today = new Date().toDateString();
+    
+    if (p.lastUpdate !== today) {
+        // Check if they failed to finish missions yesterday
+        const incomplete = p.missions && p.missions.length > 0 && p.missions.some(m => !m.done);
         
-        if (p.lastUpdate !== today) {
-            const incomplete = p.missions && p.missions.length > 0 && p.missions.some(m => !m.done);
-            
-            if (incomplete) {
-                // If they failed quests, we trigger the failure screen instead of booting
-                triggerQuestFailure(); 
-            } else {
-                // If they finished everything, just reset for the new day and boot
-                p.lastUpdate = today;
-                generateQuests();
-                save();
-                boot();
-            }
+        if (incomplete) {
+            triggerQuestFailure(); // This handles its own boot() via acknowledgePenalty
         } else {
-            // Same day, just boot normally
+            // Success! Check for rewards before resetting quests
+            checkDailyRewards(); 
+            
+            p.lastUpdate = today;
+            generateQuests();
+            save();
             boot();
         }
+    } else {
+        boot(); // Same day, proceed to UI
     }
+}
     function save() { 
         if(auth.currentUser && p) {
             db.collection('hunters').doc(auth.currentUser.uid).set(p); 
@@ -737,33 +750,30 @@ function executeMission(id) {
     // --- 3. DAILY CLEAR REWARD ---
     // --- 3. DAILY CLEAR REWARD ---
     // --- 3. DAILY CLEAR REWARD ---
+function checkDailyRewards() {
+    if (!p.missions || p.missions.length === 0) return;
+    
     if (p.missions.every(m => m.done)) {
         p.streak++;
         
-        // Define reward tiers
         const commonRewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
         const rareRewards = ["Shadow Essence", "Warrior's Spirit", "Scholar's Scroll", "Elixir of Life"];
-        const legendaryRewards = ["System Key", "Elixir of Greatness"]; // Greatness = +5 to ALL stats
+        const legendaryRewards = ["System Key", "Elixir of Greatness"];
 
         let pool = [...commonRewards];
-        
-        // At Level 20+, Rare items enter the pool
         if (p.level >= 20) pool.push(...rareRewards);
-        
-        // At Level 30+, the System Key (Legendary) has a chance to drop
         if (p.level >= 30) pool.push(...legendaryRewards);
 
         const r = pool[Math.floor(Math.random() * pool.length)];
         p.cargo[r] = (p.cargo[r] || 0) + 1;
         
-        // Display with rarity coloring
         let color = "var(--accent)";
-        if (rareRewards.includes(r)) color = "#00ff95"; // Rare Green
-        if (legendaryRewards.includes(r)) color = "#ffaa00"; // Legendary Gold
+        if (rareRewards.includes(r)) color = "#00ff95"; 
+        if (legendaryRewards.includes(r)) color = "#ffaa00"; 
 
         showSystemMessage("QUEST CLEAR", `Daily tasks finalized. <br>Received: <span style="color:${color}">${r}</span>`);
     }
-
+}
     // --- 4. LEVEL UP CHECK (OVERFLOW + SCALING) ---
     // Formula: Every level requires 100 + (Level * 5)
     let nextLevelGoal = 100 + (p.level * 5);
@@ -831,11 +841,11 @@ function executeMission(id) {
     }
 
     function acknowledgePenalty() {
-        document.body.classList.remove('penalty-bg');
-        const failScreen = document.getElementById('failure-screen');
-        if (failScreen) failScreen.remove();
-        boot(); // Now enter the game
-    }
+    document.body.classList.remove('penalty-bg');
+    const failScreen = document.getElementById('failure-screen');
+    if (failScreen) failScreen.remove();
+    boot(); 
+}
     const itemEffects = {
     "Rest Protocol": { desc: "Increases Vitality (VIT) by 5. Purple Grade.", run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }},
     "Dopamine Hit": { desc: "Grants 15 EXP. Purple Grade.", run: () => { p.exp += 15; return "EXP increased by 15."; }},
@@ -1114,6 +1124,7 @@ function closeProfile() {
 </script>
 </body>
 </html>
+
 
 
 
