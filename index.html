@@ -72,6 +72,17 @@
             padding: 40px;
             text-align: center;
         }
+        .lb-trend {
+            font-size: 0.8rem;
+            width: 25px;
+            text-align: center;
+            margin-right: 10px;
+        }
+
+        .trend-up { color: #00ff88; text-shadow: 0 0 5px #00ff8855; }
+        .trend-down { color: #ff4444; text-shadow: 0 0 5px #ff444455; }
+        .trend-new { color: var(--accent); opacity: 0.6; }
+        .trend-stable { color: #444; }
 
         .btn-group {
             display: flex;
@@ -216,6 +227,39 @@
     position: relative;
     overflow: hidden;
 }
+        /* The Pop-up Overlay */
+#profile-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    justify-content: center; align-items: center;
+    backdrop-filter: blur(5px);
+}
+
+.profile-card {
+    background: #111;
+    border: 1px solid var(--accent);
+    padding: 20px;
+    width: 280px;
+    text-align: center;
+    box-shadow: 0 0 20px var(--accent-low);
+}
+
+.profile-card h2 { color: var(--accent); margin-bottom: 5px; text-transform: uppercase; }
+.profile-card p { margin: 10px 0; color: #bbb; font-family: 'Courier New', monospace; }
+.profile-card .stat-val { color: #fff; font-weight: bold; }
+
+.close-btn {
+    margin-top: 15px;
+    background: transparent;
+    border: 1px solid #444;
+    color: #888;
+    padding: 5px 15px;
+    cursor: pointer;
+}
+.close-btn:hover { border-color: var(--accent); color: white; }
 
 .lb-item.is-me {
     border-color: var(--accent);
@@ -325,6 +369,17 @@
     </style>
 </head>
 <body>
+    <div id="profile-overlay" onclick="closeProfile()">
+        <div class="profile-card" onclick="event.stopPropagation()">
+            <small style="color:var(--accent); opacity:0.5;">- HUNTER DATA -</small>
+            <h2 id="p-name">---</h2>
+            <hr style="border:0; border-top:1px solid #333; margin:15px 0;">
+            <p>LEVEL: <span id="p-level" class="stat-val">0</span></p>
+            <p>EXP: <span id="p-exp" class="stat-val">0</span></p>
+            <p>STREAK: <span id="p-streak" class="stat-val">0</span> DAYS</p>
+            <button class="close-btn" onclick="closeProfile()">CLOSE</button>
+        </div>
+    </div>
 
 <div class="app-container">
     <div id="notice-overlay" class="overlay">
@@ -895,42 +950,55 @@ function consumeItem(itemName) {
 }
     function fetchLeaderboard() {
     const lbDisplay = document.getElementById('leaderboard-display');
-    console.log("System: Initiating Hunter Sync...");
-
+    
     db.collection('hunters')
       .orderBy('level', 'desc')
       .limit(20)
       .onSnapshot(snapshot => {
-          if (snapshot.empty) {
-              lbDisplay.innerHTML = `<div style="text-align:center; padding:40px; color:#444;">[ NO HUNTERS DETECTED ]<br><small>Ensure documents have a "level" field</small></div>`;
-              return;
-          }
-          
           lbDisplay.innerHTML = "";
           snapshot.docs.forEach((doc, index) => {
               const data = doc.data();
-              const isMe = auth.currentUser && auth.currentUser.uid === doc.id;
+              const currentRank = index + 1;
               
-              // Only render if the document actually has a name and level
+              // We add 'onclick' here and pass the data to our pop-up function
               lbDisplay.innerHTML += `
-                  <div class="lb-item ${isMe ? 'is-me' : ''}">
-                      <div class="lb-rank">#${(index + 1).toString().padStart(2, '0')}</div>
+                  <div class="lb-item" onclick="showProfile('${doc.id}')" style="cursor:pointer">
+                      <div class="lb-rank">${currentRank.toString().padStart(2, '0')}</div>
                       <div class="lb-info">
-                          <span class="name">${data.name || "UNREGISTERED"}</span>
-                          <span class="job">${data.job || "UNAWAKENED"}</span>
+                          <span class="name">${data.name || "UNKNOWN"}</span>
+                          <span class="job">${data.job || "HUNTER"}</span>
                       </div>
-                      <div class="lb-level">LVL ${data.level || 0}</div>
+                      <div class="lb-level">LVL ${data.level}</div>
                   </div>
               `;
           });
-      }, error => {
-          console.error("CRITICAL ERROR:", error.message);
-          lbDisplay.innerHTML = `<div style="color:var(--danger); font-size:0.7rem;">ERROR: ${error.message}</div>`;
       });
+}
+    function showProfile(userId) {
+    // Fetch the specific hunter's data from Firestore
+    db.collection('hunters').doc(userId).get().then((doc) => {
+        if (doc.exists) {
+            const data = doc.data();
+            
+            // Fill the pop-up with data
+            document.getElementById('p-name').innerText = data.name || "UNKNOWN";
+            document.getElementById('p-level').innerText = data.level || 0;
+            document.getElementById('p-exp').innerText = Math.floor(data.exp || 0);
+            document.getElementById('p-streak').innerText = data.streak || 0;
+            
+            // Show the overlay
+            document.getElementById('profile-overlay').style.display = 'flex';
+        }
+    });
+}
+
+function closeProfile() {
+    document.getElementById('profile-overlay').style.display = 'none';
 }
 </script>
 </body>
 </html>
+
 
 
 
