@@ -651,29 +651,31 @@ function generateQuests() {
 
     // Step 1: The Trigger (Asks the player)
 function completeMission(id) {
+    // BUG FIX: Check if mission is already done before showing the popup
+    const mission = p.missions.find(m => m.id == id);
+    if (!mission || mission.done) {
+        showNotice("ALREADY COMPLETED");
+        return; 
+    }
+
     playSfx('click');
     
-    // Find the specific mission name for the pop-up
-    const mission = p.missions.find(m => m.id == id);
-    
-    // Create the Confirmation Overlay
     const confirmOverlay = document.createElement('div');
     confirmOverlay.className = 'overlay';
     confirmOverlay.id = 'confirm-overlay';
     confirmOverlay.innerHTML = `
         <div class="hologram">
-            <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem;">[ MISSION COMPLETION ]</div>
-            <h2 style="margin:15px 0; font-weight:300;">Confirm Results?</h2>
-            <p style="font-size:0.8rem; color:#aaa;">Have you truly completed: <br><b>${mission.n}</b>?</p>
+            <div style="color:var(--accent); font-size:0.7rem;">[ MISSION COMPLETION ]</div>
+            <h2 style="margin:15px 0;">Confirm Results?</h2>
+            <p style="font-size:0.8rem;">Have you truly completed: <br><b>${mission.n}</b>?</p>
             <div class="btn-group">
-                <button class="btn btn-confirm" onclick="executeMission('${id}')">YES</button>
-                <button class="btn btn-cancel" onclick="this.parentElement.parentElement.parentElement.remove()">NO</button>
+                <button class="btn" onclick="executeMission('${id}')">YES</button>
+                <button class="btn" onclick="this.parentElement.parentElement.parentElement.remove()">NO</button>
             </div>
         </div>
     `;
     document.body.appendChild(confirmOverlay);
-}
-    
+}    
 function checkDailyCompletion() {
     const regularMissions = p.missions.filter(m => !m.isSurprise);
     const surpriseMission = p.missions.find(m => m.isSurprise);
@@ -729,26 +731,51 @@ function checkDailyCompletion() {
 }
 
 // Step 2: The Execution (Gives rewards)
-function executeMission(id) {
-    // Remove the confirmation popup
+async function executeMission(id) {
     const confirmOverlay = document.getElementById('confirm-overlay');
     if (confirmOverlay) confirmOverlay.remove();
     
-    // Find mission
     let mission = p.missions.find(m => m.id == id);
     if (!mission || mission.done) return;
 
-    // Mark as done and give rewards
+    // 1. Mark mission as done
     mission.done = true;
-    gainExp(10); // Or whatever your exp amount is
-    
-    save();
-    renderMissions(); // Refresh the list
-    showNotice("MISSION COMPLETE");
-}
 
-    // --- 3. DAILY CLEAR REWARD ---
-    // --- 3. DAILY CLEAR REWARD ---
+    // 2. Grant EXP immediately
+    const rewardExp = 20; // Set your desired EXP per mission
+    p.exp += rewardExp;
+
+    // 3. Level Up Check
+    const goal = 100 + (p.level * 5);
+    if (p.exp >= goal) {
+        p.exp -= goal;
+        p.level++;
+        if(typeof playSfx === 'function') playSfx('levelUp');
+    }
+
+    // 4. CHECK FOR DAILY CLEAR REWARD
+    // If every mission in the list is now done, give the extra reward
+    if (p.missions.every(m => m.done)) {
+        p.streak++;
+        const itemPool = ["Blessed Box", "Focus Token", "Dopamine Hit"];
+        const randomItem = itemPool[Math.floor(Math.random() * itemPool.length)];
+        
+        // Add to cargo
+        p.cargo[randomItem] = (p.cargo[randomItem] || 0) + 1;
+        
+        showSystemMessage("QUEST CLEAR", `All missions done! <br>Received: ${randomItem}`);
+    }
+
+    // 5. Save and Update UI
+    try {
+        await db.collection('hunters').doc(auth.currentUser.uid).set(p);
+        updateUI();
+        render('mission'); // Refresh the list to show the green "done" state
+    } catch (e) {
+        console.error("Sync error:", e);
+        mission.done = false; // Rollback if save fails
+    }
+}
     // --- 3. DAILY CLEAR REWARD ---
 function checkDailyRewards() {
     if (!p.missions || p.missions.length === 0) return;
@@ -1123,6 +1150,7 @@ function closeProfile() {
 </script>
 </body>
 </html>
+
 
 
 
