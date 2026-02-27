@@ -895,41 +895,43 @@ function consumeItem(itemName) {
 }
     function fetchLeaderboard() {
     const lbDisplay = document.getElementById('leaderboard-display');
-    
-    // Querying 'hunters' collection by Level (Highest to Lowest)
+    console.log("System: Initiating Hunter Sync...");
+
     db.collection('hunters')
       .orderBy('level', 'desc')
       .limit(20)
       .onSnapshot(snapshot => {
-          if (!document.getElementById('leaderboard-display')) return; // Exit if user switched tabs
+          if (snapshot.empty) {
+              lbDisplay.innerHTML = `<div style="text-align:center; padding:40px; color:#444;">[ NO HUNTERS DETECTED ]<br><small>Ensure documents have a "level" field</small></div>`;
+              return;
+          }
           
           lbDisplay.innerHTML = "";
-          
           snapshot.docs.forEach((doc, index) => {
               const data = doc.data();
               const isMe = auth.currentUser && auth.currentUser.uid === doc.id;
-              const rank = index + 1;
-
-              const item = document.createElement('div');
-              item.className = `lb-item ${isMe ? 'is-me' : ''}`;
-              item.innerHTML = `
-                  <div class="lb-rank">${rank.toString().padStart(2, '0')}</div>
-                  <div class="lb-info">
-                      <span class="name">${data.name || "UNKNOWN"} ${isMe ? '(YOU)' : ''}</span>
-                      <span class="job">${data.job || "UNAWAKENED"}</span>
+              
+              // Only render if the document actually has a name and level
+              lbDisplay.innerHTML += `
+                  <div class="lb-item ${isMe ? 'is-me' : ''}">
+                      <div class="lb-rank">#${(index + 1).toString().padStart(2, '0')}</div>
+                      <div class="lb-info">
+                          <span class="name">${data.name || "UNREGISTERED"}</span>
+                          <span class="job">${data.job || "UNAWAKENED"}</span>
+                      </div>
+                      <div class="lb-level">LVL ${data.level || 0}</div>
                   </div>
-                  <div class="lb-level">LVL ${data.level}</div>
               `;
-              lbDisplay.appendChild(item);
           });
       }, error => {
-          console.error("Leaderboard Error:", error);
-          lbDisplay.innerHTML = `<div style="color:var(--danger); font-size:0.7rem;">FAILED TO SYNC RANKINGS. CHECK INDEXES.</div>`;
+          console.error("CRITICAL ERROR:", error.message);
+          lbDisplay.innerHTML = `<div style="color:var(--danger); font-size:0.7rem;">ERROR: ${error.message}</div>`;
       });
 }
 </script>
 </body>
 </html>
+
 
 
 
