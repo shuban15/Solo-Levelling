@@ -512,7 +512,8 @@ function playSfx(type) {
 
         if (doc.exists) {
             p = doc.data();
-            checkSystemDay();
+            // We check the day AFTER we have the data, but BEFORE the boot
+            checkSystemDay(); 
         } else {
             p = {
                 name: user.displayName, level: 1, exp: 0, streak: 0, job: "UNAWAKENED",
@@ -520,44 +521,53 @@ function playSfx(type) {
                 cargo: {}, missions: [], lastUpdate: new Date().toDateString()
             };
             await docRef.set(p);
+            boot(); // New users go straight to boot
         }
-        boot();
     }
 
     function boot() {
+        // Clear all overlays
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('header, nav, #main-content').forEach(el => el.classList.remove('hidden'));
+        
+        // Show main UI
+        document.getElementById('main-header').classList.remove('hidden');
+        document.getElementById('main-nav').classList.remove('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+        
         document.getElementById('disp-name').innerText = p.name.toUpperCase();
+        
         if (!p.missions || p.missions.length === 0) generateQuests();
+        
         updateUI();
         render('status');
     }
 
-    function save() { 
-        if(auth.currentUser) db.collection('hunters').doc(auth.currentUser.uid).update(p); 
-    }
-
     function checkSystemDay() {
-    const today = new Date().toDateString();
-    
-    // Check if the date has changed
-    if (p.lastUpdate !== today) {
-        const incomplete = p.missions.some(m => !m.done);
+        const today = new Date().toDateString();
         
-        // IMPORTANT: Hide the initial loader before showing the failure screen
-        const initLoader = document.getElementById('init-loader'); 
-        if (initLoader) initLoader.style.display = 'none';
-
-        if (incomplete) {
-            triggerQuestFailure(); 
-            return; // Stop here so it doesn't try to run normal boot logic
+        if (p.lastUpdate !== today) {
+            const incomplete = p.missions && p.missions.length > 0 && p.missions.some(m => !m.done);
+            
+            if (incomplete) {
+                // If they failed quests, we trigger the failure screen instead of booting
+                triggerQuestFailure(); 
+            } else {
+                // If they finished everything, just reset for the new day and boot
+                p.lastUpdate = today;
+                generateQuests();
+                save();
+                boot();
+            }
         } else {
-            p.lastUpdate = today;
-            generateQuests();
-            save();
+            // Same day, just boot normally
+            boot();
         }
     }
-}
+    function save() { 
+        if(auth.currentUser && p) {
+            db.collection('hunters').doc(auth.currentUser.uid).set(p); 
+        }
+    }
 
     // --- MISSIONS ---
 function generateQuests() {
@@ -788,39 +798,44 @@ function executeMission(id) {
     render('mission');
 }
     function triggerQuestFailure() {
-        // This force-hides any existing "Initializing" screens
-    document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
-    
-    playSfx('alert');
-    
-    // 1. Create the Failure Overlay
-    const failOverlay = document.createElement('div');
-    failOverlay.className = 'overlay';
-    failOverlay.style.zIndex = "9999";
-    failOverlay.innerHTML = `
-        <div class="hologram" style="border-color: var(--danger); box-shadow: 0 0 30px rgba(255,0,0,0.3);">
-            <div class="penalty-text">WARNING</div>
-            <p style="color:#fff; font-size:0.9rem;">DAILY QUESTS INCOMPLETE.</p>
-            <p style="color:var(--danger); font-family:'JetBrains Mono'; font-size:0.7rem;">
-                PENALTY PROTOCOL INITIATED:<br>LEVEL REDUCED / STREAK RESET
-            </p>
-            <button class="btn btn-cancel" onclick="location.reload()" style="margin-top:20px;">ACKNOWLEDGE</button>
-        </div>
-    `;
-    document.body.appendChild(failOverlay);
+        // Force hide the initialization overlays
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        
+        playSfx('alert');
+        
+        // Apply Penalties immediately to the data
+        if (p.level > 1) p.level--;
+        p.streak = 0;
+        p.exp = 0;
+        p.lastUpdate = new Date().toDateString(); // Set to today so it doesn't loop
+        generateQuests();
+        save();
 
-    // 2. Visual Glitch
-    document.body.classList.add('penalty-bg');
-    
-    // 3. Apply Penalties
-    if (p.level > 1) p.level--;
-    p.streak = 0;
-    p.exp = 0;
-    
-    // 4. Generate fresh quests for the new day
-    generateQuests();
-    save();
-}
+        // Show the failure screen
+        const failOverlay = document.createElement('div');
+        failOverlay.className = 'overlay';
+        failOverlay.id = "failure-screen";
+        failOverlay.style.zIndex = "9999";
+        failOverlay.innerHTML = `
+            <div class="hologram" style="border-color: var(--danger); box-shadow: 0 0 30px rgba(255,0,0,0.3);">
+                <div class="penalty-text">WARNING</div>
+                <p style="color:#fff; font-size:0.9rem;">DAILY QUESTS INCOMPLETE.</p>
+                <p style="color:var(--danger); font-family:'JetBrains Mono'; font-size:0.7rem;">
+                    PENALTY PROTOCOL INITIATED:<br>LEVEL REDUCED / STREAK RESET
+                </p>
+                <button class="btn btn-cancel" onclick="acknowledgePenalty()" style="margin-top:20px;">ACKNOWLEDGE</button>
+            </div>
+        `;
+        document.body.appendChild(failOverlay);
+        document.body.classList.add('penalty-bg');
+    }
+
+    function acknowledgePenalty() {
+        document.body.classList.remove('penalty-bg');
+        const failScreen = document.getElementById('failure-screen');
+        if (failScreen) failScreen.remove();
+        boot(); // Now enter the game
+    }
     const itemEffects = {
     "Rest Protocol": { desc: "Increases Vitality (VIT) by 5. Purple Grade.", run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }},
     "Dopamine Hit": { desc: "Grants 15 EXP. Purple Grade.", run: () => { p.exp += 15; return "EXP increased by 15."; }},
@@ -1099,6 +1114,7 @@ function closeProfile() {
 </script>
 </body>
 </html>
+
 
 
 
