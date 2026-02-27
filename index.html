@@ -293,6 +293,26 @@
     font-weight: bold;
     color: var(--accent);
 }
+        /* Penalty Glitch Effect */
+.penalty-bg {
+    animation: penalty-flash 0.5s infinite;
+    background: rgba(255, 0, 0, 0.2) !important;
+}
+
+@keyframes penalty-flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.penalty-text {
+    color: var(--danger);
+    font-family: 'JetBrains Mono';
+    text-shadow: 0 0 15px rgba(255, 62, 62, 0.8);
+    font-size: 1.5rem;
+    letter-spacing: 5px;
+    margin-bottom: 20px;
+}
 
 /* Top 3 Glow */
 .lb-item:nth-child(1) .lb-rank { color: #FFD700; text-shadow: 0 0 10px #FFD70055; }
@@ -518,18 +538,19 @@ function playSfx(type) {
     }
 
     function checkSystemDay() {
-        const today = new Date().toDateString();
-        if (p.lastUpdate !== today) {
-            const incomplete = p.missions.some(m => !m.done);
-            if (incomplete && p.level > 1) {
-                p.level--; p.streak = 0;
-                alert("PENALTY PROTOCOL: Daily Quest Incomplete. Level Reduced.");
-            }
+    const today = new Date().toDateString();
+    if (p.lastUpdate !== today) {
+        const incomplete = p.missions.some(m => !m.done);
+        
+        if (incomplete) {
+            triggerQuestFailure(); // Show the cool animation instead of a boring alert
+        } else {
             p.lastUpdate = today;
             generateQuests();
             save();
         }
     }
+}
 
     // --- MISSIONS ---
 function generateQuests() {
@@ -599,11 +620,11 @@ function generateQuests() {
 }
 
     // Step 1: The Trigger (Asks the player)
-function completeMission(reward) {
-    gainExp(reward);
-    // Any mission-specific logic here...
-    
+function completeMission(id) {
     playSfx('click');
+    
+    // Find the specific mission name for the pop-up
+    const mission = p.missions.find(m => m.id == id);
     
     // Create the Confirmation Overlay
     const confirmOverlay = document.createElement('div');
@@ -613,9 +634,9 @@ function completeMission(reward) {
         <div class="hologram">
             <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem;">[ MISSION COMPLETION ]</div>
             <h2 style="margin:15px 0; font-weight:300;">Confirm Results?</h2>
-            <p style="font-size:0.8rem; color:#aaa;">Have you truly completed: <br><b>${p.missions[id].n}</b>?</p>
+            <p style="font-size:0.8rem; color:#aaa;">Have you truly completed: <br><b>${mission.n}</b>?</p>
             <div class="btn-group">
-                <button class="btn btn-confirm" onclick="executeMission(${id})">YES</button>
+                <button class="btn btn-confirm" onclick="executeMission('${id}')">YES</button>
                 <button class="btn btn-cancel" onclick="this.parentElement.parentElement.parentElement.remove()">NO</button>
             </div>
         </div>
@@ -681,6 +702,12 @@ function checkDailyCompletion() {
 function executeMission(id) {
     const confirmOverlay = document.getElementById('confirm-overlay');
     if (confirmOverlay) confirmOverlay.remove();
+    
+    // Correctly find the mission in the array
+    let mission = p.missions.find(m => m.id == id);
+    if (!mission || mission.done) return; // Prevent double-completing
+
+    let expGain = 10;
     
     // --- 1. DYNAMIC EXP REWARD ---
     let mission = p.missions[id] || p.missions.find(m => m.id === id);
@@ -767,6 +794,37 @@ function executeMission(id) {
     save(); 
     updateUI(); 
     render('mission');
+}
+    function triggerQuestFailure() {
+    playSfx('alert');
+    
+    // 1. Create the Failure Overlay
+    const failOverlay = document.createElement('div');
+    failOverlay.className = 'overlay';
+    failOverlay.style.zIndex = "9999";
+    failOverlay.innerHTML = `
+        <div class="hologram" style="border-color: var(--danger); box-shadow: 0 0 30px rgba(255,0,0,0.3);">
+            <div class="penalty-text">WARNING</div>
+            <p style="color:#fff; font-size:0.9rem;">DAILY QUESTS INCOMPLETE.</p>
+            <p style="color:var(--danger); font-family:'JetBrains Mono'; font-size:0.7rem;">
+                PENALTY PROTOCOL INITIATED:<br>LEVEL REDUCED / STREAK RESET
+            </p>
+            <button class="btn btn-cancel" onclick="location.reload()" style="margin-top:20px;">ACKNOWLEDGE</button>
+        </div>
+    `;
+    document.body.appendChild(failOverlay);
+
+    // 2. Visual Glitch
+    document.body.classList.add('penalty-bg');
+    
+    // 3. Apply Penalties
+    if (p.level > 1) p.level--;
+    p.streak = 0;
+    p.exp = 0;
+    
+    // 4. Generate fresh quests for the new day
+    generateQuests();
+    save();
 }
     const itemEffects = {
     "Rest Protocol": { desc: "Increases Vitality (VIT) by 5. Purple Grade.", run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }},
@@ -927,15 +985,32 @@ function consumeItem(itemName) {
     }
 
     function updateTimer() {
-        const el = document.getElementById('timer');
-        if(!el) return;
-        const end = new Date(); end.setHours(23,59,59,999);
-        const diff = end - new Date();
-        const h = Math.floor(diff/3600000).toString().padStart(2,'0');
-        const m = Math.floor((diff%3600000)/60000).toString().padStart(2,'0');
-        const s = Math.floor((diff%60000)/1000).toString().padStart(2,'0');
-        el.innerText = `${h}:${m}:${s}`;
+    const now = new Date();
+    const tonight = new Date();
+    tonight.setHours(23, 59, 59, 999);
+
+    const diff = tonight - now;
+
+    if (diff <= 0) {
+        // CHECK: If there are unfinished quests, fail them!
+        const unfinished = p.missions.some(m => !m.done);
+        if (unfinished) {
+            triggerQuestFailure();
+        } else {
+            // If they were all done, just refresh quests for tomorrow
+            generateQuests();
+            location.reload(); 
+        }
+        return;
     }
+
+    const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+    const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+
+    const timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.innerText = `${h}:${m}:${s}`;
+}
     
     function showSystemMessage(title, body) {
         playSfx('ping'); // <--- Add this line
@@ -1011,18 +1086,13 @@ function consumeItem(itemName) {
       });
 }
     function showProfile(userId) {
-    // Fetch the specific hunter's data from Firestore
     db.collection('hunters').doc(userId).get().then((doc) => {
         if (doc.exists) {
-            const data = doc.data();
-            
-            // Fill the pop-up with data
-            document.getElementById('p-name').innerText = data.name || "UNKNOWN";
-            document.getElementById('p-level').innerText = data.level || 0;
-            document.getElementById('p-exp').innerText = Math.floor(data.exp || 0);
-            document.getElementById('p-streak').innerText = data.streak || 0;
-            
-            // Show the overlay
+            const hunterData = doc.data(); // Use 'hunterData', NOT 'p'
+            document.getElementById('p-name').innerText = hunterData.name || "UNKNOWN";
+            document.getElementById('p-level').innerText = hunterData.level || 0;
+            document.getElementById('p-exp').innerText = Math.floor(hunterData.exp || 0);
+            document.getElementById('p-streak').innerText = hunterData.streak || 0;
             document.getElementById('profile-overlay').style.display = 'flex';
         }
     });
@@ -1034,6 +1104,7 @@ function closeProfile() {
 </script>
 </body>
 </html>
+
 
 
 
