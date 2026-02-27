@@ -599,8 +599,9 @@ function generateQuests() {
 }
 
     // Step 1: The Trigger (Asks the player)
-function completeMission(id) {
-    if (p.missions[id].done) return;
+function completeMission(reward) {
+    gainExp(reward);
+    // Any mission-specific logic here...
     
     playSfx('click');
     
@@ -642,6 +643,38 @@ function checkDailyCompletion() {
         save();
         updateUI();
     }
+}
+    function gainExp(amount) {
+    p.exp += amount;
+    
+    // The "while" loop ensures multiple level-ups if the gain is huge
+    let leveledUp = false;
+    while (p.exp >= nextLevelGoal) {
+        p.exp -= nextLevelGoal;
+        p.level++;
+        leveledUp = true;
+        
+        // If your level-up requirement increases, update it here:
+        // nextLevelGoal = p.level * 100; 
+    }
+
+    if (leveledUp) {
+        showSystemMessage(`LEVEL UP! YOU ARE NOW LVL ${p.level}`);
+        if(window.playSfx) playSfx('levelup');
+    }
+
+    save();
+    // Re-render whatever screen the player is on
+    if(typeof currentTab !== 'undefined') render(currentTab);
+}
+    function useDopamineHit() {
+    const reward = 15; // Or whatever your value is
+    
+    // Use the master function! 
+    // This handles the exp, the level up, and the save automatically.
+    gainExp(reward);
+    
+    showSystemMessage("DOPAMINE HIT: +50 EXP RECEIVED");
 }
 
 // Step 2: The Execution (Gives rewards)
@@ -952,7 +985,8 @@ function consumeItem(itemName) {
     const lbDisplay = document.getElementById('leaderboard-display');
     
     db.collection('hunters')
-      .orderBy('level', 'desc')
+      .orderBy('level', 'desc') // Primary Sort
+      .orderBy('exp', 'desc')   // Secondary Sort (The Tie-Breaker)
       .limit(20)
       .onSnapshot(snapshot => {
           lbDisplay.innerHTML = "";
@@ -960,7 +994,6 @@ function consumeItem(itemName) {
               const data = doc.data();
               const currentRank = index + 1;
               
-              // We add 'onclick' here and pass the data to our pop-up function
               lbDisplay.innerHTML += `
                   <div class="lb-item" onclick="showProfile('${doc.id}')" style="cursor:pointer">
                       <div class="lb-rank">${currentRank.toString().padStart(2, '0')}</div>
@@ -972,6 +1005,9 @@ function consumeItem(itemName) {
                   </div>
               `;
           });
+      }, error => {
+          console.log("Index Error: ", error.message);
+          // If you see an error here, check the link in the browser console (F12)
       });
 }
     function showProfile(userId) {
@@ -998,6 +1034,7 @@ function closeProfile() {
 </script>
 </body>
 </html>
+
 
 
 
