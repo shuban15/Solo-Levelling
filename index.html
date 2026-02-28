@@ -899,6 +899,7 @@ function consumeItem(itemName) {
     // Querying 'hunters' collection by Level (Highest to Lowest)
     db.collection('hunters')
       .orderBy('level', 'desc')
+      .orderBy('exp', 'desc')
       .limit(20)
       .onSnapshot(snapshot => {
           if (!document.getElementById('leaderboard-display')) return; // Exit if user switched tabs
@@ -930,6 +931,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
