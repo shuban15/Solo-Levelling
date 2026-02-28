@@ -72,17 +72,6 @@
             padding: 40px;
             text-align: center;
         }
-        .lb-trend {
-            font-size: 0.8rem;
-            width: 25px;
-            text-align: center;
-            margin-right: 10px;
-        }
-
-        .trend-up { color: #00ff88; text-shadow: 0 0 5px #00ff8855; }
-        .trend-down { color: #ff4444; text-shadow: 0 0 5px #ff444455; }
-        .trend-new { color: var(--accent); opacity: 0.6; }
-        .trend-stable { color: #444; }
 
         .btn-group {
             display: flex;
@@ -227,39 +216,6 @@
     position: relative;
     overflow: hidden;
 }
-        /* The Pop-up Overlay */
-#profile-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 1000;
-    justify-content: center; align-items: center;
-    backdrop-filter: blur(5px);
-}
-
-.profile-card {
-    background: #111;
-    border: 1px solid var(--accent);
-    padding: 20px;
-    width: 280px;
-    text-align: center;
-    box-shadow: 0 0 20px var(--accent-low);
-}
-
-.profile-card h2 { color: var(--accent); margin-bottom: 5px; text-transform: uppercase; }
-.profile-card p { margin: 10px 0; color: #bbb; font-family: 'Courier New', monospace; }
-.profile-card .stat-val { color: #fff; font-weight: bold; }
-
-.close-btn {
-    margin-top: 15px;
-    background: transparent;
-    border: 1px solid #444;
-    color: #888;
-    padding: 5px 15px;
-    cursor: pointer;
-}
-.close-btn:hover { border-color: var(--accent); color: white; }
 
 .lb-item.is-me {
     border-color: var(--accent);
@@ -292,26 +248,6 @@
     font-family: 'JetBrains Mono';
     font-weight: bold;
     color: var(--accent);
-}
-        /* Penalty Glitch Effect */
-.penalty-bg {
-    animation: penalty-flash 0.5s infinite;
-    background: rgba(255, 0, 0, 0.2) !important;
-}
-
-@keyframes penalty-flash {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-
-.penalty-text {
-    color: var(--danger);
-    font-family: 'JetBrains Mono';
-    text-shadow: 0 0 15px rgba(255, 62, 62, 0.8);
-    font-size: 1.5rem;
-    letter-spacing: 5px;
-    margin-bottom: 20px;
 }
 
 /* Top 3 Glow */
@@ -389,17 +325,6 @@
     </style>
 </head>
 <body>
-    <div id="profile-overlay" onclick="closeProfile()">
-        <div class="profile-card" onclick="event.stopPropagation()">
-            <small style="color:var(--accent); opacity:0.5;">- HUNTER DATA -</small>
-            <h2 id="p-name">---</h2>
-            <hr style="border:0; border-top:1px solid #333; margin:15px 0;">
-            <p>LEVEL: <span id="p-level" class="stat-val">0</span></p>
-            <p>EXP: <span id="p-exp" class="stat-val">0</span></p>
-            <p>STREAK: <span id="p-streak" class="stat-val">0</span> DAYS</p>
-            <button class="close-btn" onclick="closeProfile()">CLOSE</button>
-        </div>
-    </div>
 
 <div class="app-container">
     <div id="notice-overlay" class="overlay">
@@ -507,78 +432,47 @@ function playSfx(type) {
 
     // --- DATA SYNC ---
     async function syncHunter(user) {
-    const docRef = db.collection('hunters').doc(user.uid);
-    const doc = await docRef.get();
+        const docRef = db.collection('hunters').doc(user.uid);
+        const doc = await docRef.get();
 
-    if (doc.exists) {
-        p = doc.data();
-        // Check for new day before showing the UI
-        checkSystemDay(); 
-    } else {
-        // New Player Initialization
-        p = {
-            name: user.displayName || "HUNTER", 
-            level: 1, 
-            exp: 0, 
-            streak: 0, 
-            job: "UNAWAKENED",
-            stats: { STR: 10, AGI: 10, VIT: 10, INT: 10, FOC: 10 },
-            cargo: {}, 
-            missions: [], 
-            lastUpdate: new Date().toDateString()
-        };
-        await docRef.set(p);
-        boot(); 
+        if (doc.exists) {
+            p = doc.data();
+            checkSystemDay();
+        } else {
+            p = {
+                name: user.displayName, level: 1, exp: 0, streak: 0, job: "UNAWAKENED",
+                stats: { STR: 10, AGI: 10, VIT: 10, INT: 10, FOC: 10 },
+                cargo: {}, missions: [], lastUpdate: new Date().toDateString()
+            };
+            await docRef.set(p);
+        }
+        boot();
     }
-}
-    function boot() {
-    if (!p) return; // Hard safety stop
 
-    // 1. Hide ALL overlays
-    document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-    
-    // 2. Reveal UI
-    document.getElementById('main-header').classList.remove('hidden');
-    document.getElementById('main-nav').classList.remove('hidden');
-    document.getElementById('main-content').classList.remove('hidden');
-    
-    // 3. Set Name
-    const nameDisplay = document.getElementById('disp-name');
-    if (nameDisplay) nameDisplay.innerText = p.name.toUpperCase();
-    
-    // 4. Ensure quests exist
-    if (!p.missions || p.missions.length === 0) generateQuests();
-    
-    // 5. Final UI Update
-    updateUI();
-    render('status'); 
-}
+    function boot() {
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('header, nav, #main-content').forEach(el => el.classList.remove('hidden'));
+        document.getElementById('disp-name').innerText = p.name.toUpperCase();
+        if (!p.missions || p.missions.length === 0) generateQuests();
+        updateUI();
+        render('status');
+    }
+
+    function save() { 
+        if(auth.currentUser) db.collection('hunters').doc(auth.currentUser.uid).update(p); 
+    }
 
     function checkSystemDay() {
-    const today = new Date().toDateString();
-    
-    if (p.lastUpdate !== today) {
-        // Check if they failed to finish missions yesterday
-        const incomplete = p.missions && p.missions.length > 0 && p.missions.some(m => !m.done);
-        
-        if (incomplete) {
-            triggerQuestFailure(); // This handles its own boot() via acknowledgePenalty
-        } else {
-            // Success! Check for rewards before resetting quests
-            checkDailyRewards(); 
-            
+        const today = new Date().toDateString();
+        if (p.lastUpdate !== today) {
+            const incomplete = p.missions.some(m => !m.done);
+            if (incomplete && p.level > 1) {
+                p.level--; p.streak = 0;
+                alert("PENALTY PROTOCOL: Daily Quest Incomplete. Level Reduced.");
+            }
             p.lastUpdate = today;
             generateQuests();
             save();
-            boot();
-        }
-    } else {
-        boot(); // Same day, proceed to UI
-    }
-}
-    function save() { 
-        if(auth.currentUser && p) {
-            db.collection('hunters').doc(auth.currentUser.uid).set(p); 
         }
     }
 
@@ -651,31 +545,28 @@ function generateQuests() {
 
     // Step 1: The Trigger (Asks the player)
 function completeMission(id) {
-    // BUG FIX: Check if mission is already done before showing the popup
-    const mission = p.missions.find(m => m.id == id);
-    if (!mission || mission.done) {
-        showNotice("ALREADY COMPLETED");
-        return; 
-    }
-
+    if (p.missions[id].done) return;
+    
     playSfx('click');
     
+    // Create the Confirmation Overlay
     const confirmOverlay = document.createElement('div');
     confirmOverlay.className = 'overlay';
     confirmOverlay.id = 'confirm-overlay';
     confirmOverlay.innerHTML = `
         <div class="hologram">
-            <div style="color:var(--accent); font-size:0.7rem;">[ MISSION COMPLETION ]</div>
-            <h2 style="margin:15px 0;">Confirm Results?</h2>
-            <p style="font-size:0.8rem;">Have you truly completed: <br><b>${mission.n}</b>?</p>
+            <div style="color:var(--accent); font-family:'JetBrains Mono'; font-size:0.7rem;">[ MISSION COMPLETION ]</div>
+            <h2 style="margin:15px 0; font-weight:300;">Confirm Results?</h2>
+            <p style="font-size:0.8rem; color:#aaa;">Have you truly completed: <br><b>${p.missions[id].n}</b>?</p>
             <div class="btn-group">
-                <button class="btn" onclick="executeMission('${id}')">YES</button>
-                <button class="btn" onclick="this.parentElement.parentElement.parentElement.remove()">NO</button>
+                <button class="btn btn-confirm" onclick="executeMission(${id})">YES</button>
+                <button class="btn btn-cancel" onclick="this.parentElement.parentElement.parentElement.remove()">NO</button>
             </div>
         </div>
     `;
     document.body.appendChild(confirmOverlay);
-}    
+}
+    
 function checkDailyCompletion() {
     const regularMissions = p.missions.filter(m => !m.isSurprise);
     const surpriseMission = p.missions.find(m => m.isSurprise);
@@ -697,110 +588,65 @@ function checkDailyCompletion() {
         updateUI();
     }
 }
-    function gainExp(amount) {
-    p.exp += amount;
-    
-    // The "while" loop ensures multiple level-ups if the gain is huge
-    let leveledUp = false;
-    while (p.exp >= nextLevelGoal) {
-        p.exp -= nextLevelGoal;
-        p.level++;
-        leveledUp = true;
-        
-        // If your level-up requirement increases, update it here:
-        // nextLevelGoal = p.level * 100; 
-    }
-
-    if (leveledUp) {
-        showSystemMessage(`LEVEL UP! YOU ARE NOW LVL ${p.level}`);
-        if(window.playSfx) playSfx('levelup');
-    }
-
-    save();
-    // Re-render whatever screen the player is on
-    if(typeof currentTab !== 'undefined') render(currentTab);
-}
-    function useDopamineHit() {
-    const reward = 15; // Or whatever your value is
-    
-    // Use the master function! 
-    // This handles the exp, the level up, and the save automatically.
-    gainExp(reward);
-    
-    showSystemMessage("DOPAMINE HIT: +50 EXP RECEIVED");
-}
 
 // Step 2: The Execution (Gives rewards)
-async function executeMission(id) {
+function executeMission(id) {
     const confirmOverlay = document.getElementById('confirm-overlay');
     if (confirmOverlay) confirmOverlay.remove();
     
-    let mission = p.missions.find(m => m.id == id);
-    if (!mission || mission.done) return;
+    // --- 1. DYNAMIC EXP REWARD ---
+    let mission = p.missions[id] || p.missions.find(m => m.id === id);
+    let expGain = 10; // Base for INT/FOC/VIT
 
-    // 1. Mark mission as done
-    mission.done = true;
-
-    // 2. Grant EXP immediately
-    const rewardExp = 20; // Set your desired EXP per mission
-    p.exp += rewardExp;
-
-    // 3. Level Up Check
-    const goal = 100 + (p.level * 5);
-    if (p.exp >= goal) {
-        p.exp -= goal;
-        p.level++;
-        if(typeof playSfx === 'function') playSfx('levelUp');
-    }
-
-    // 4. CHECK FOR DAILY CLEAR REWARD
-    // If every mission in the list is now done, give the extra reward
-    if (p.missions.every(m => m.done)) {
-        p.streak++;
-        const itemPool = ["Blessed Box", "Focus Token", "Dopamine Hit"];
-        const randomItem = itemPool[Math.floor(Math.random() * itemPool.length)];
-        
-        // Add to cargo
-        p.cargo[randomItem] = (p.cargo[randomItem] || 0) + 1;
-        
-        showSystemMessage("QUEST CLEAR", `All missions done! <br>Received: ${randomItem}`);
-    }
-
-    // 5. Save and Update UI
-    try {
-        await db.collection('hunters').doc(auth.currentUser.uid).set(p);
-        updateUI();
-        render('mission'); // Refresh the list to show the green "done" state
-    } catch (e) {
-        console.error("Sync error:", e);
-        mission.done = false; // Rollback if save fails
-    }
-}
-    // --- 3. DAILY CLEAR REWARD ---
-function checkDailyRewards() {
-    if (!p.missions || p.missions.length === 0) return;
+    if (mission.s === 'STR' || mission.s === 'AGI') expGain = 15; // Physical bonus
+    if (mission.isSurprise) expGain = 30; // Surprise quest bonus
     
+    // Apply rewards
+    mission.done = true;
+    p.stats[mission.s]++;
+    p.exp += expGain;
+
+    // --- 2. PENALTY CHECK (Lv. 10-15 Logic) ---
+    const surpriseQuest = p.missions.find(m => m.isSurprise);
+    const regularMissions = p.missions.filter(m => !m.isSurprise);
+    const allRegularsDone = regularMissions.every(m => m.done);
+
+    if (p.level >= 10 && p.level <= 15 && allRegularsDone && surpriseQuest && !surpriseQuest.done) {
+        p.exp = Math.max(0, p.exp - 30);
+        playSfx('alert');
+        showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
+    }
+
+    // --- 3. DAILY CLEAR REWARD ---
+    // --- 3. DAILY CLEAR REWARD ---
+    // --- 3. DAILY CLEAR REWARD ---
     if (p.missions.every(m => m.done)) {
         p.streak++;
         
+        // Define reward tiers
         const commonRewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
         const rareRewards = ["Shadow Essence", "Warrior's Spirit", "Scholar's Scroll", "Elixir of Life"];
-        const legendaryRewards = ["System Key", "Elixir of Greatness"];
+        const legendaryRewards = ["System Key", "Elixir of Greatness"]; // Greatness = +5 to ALL stats
 
         let pool = [...commonRewards];
+        
+        // At Level 20+, Rare items enter the pool
         if (p.level >= 20) pool.push(...rareRewards);
+        
+        // At Level 30+, the System Key (Legendary) has a chance to drop
         if (p.level >= 30) pool.push(...legendaryRewards);
 
         const r = pool[Math.floor(Math.random() * pool.length)];
         p.cargo[r] = (p.cargo[r] || 0) + 1;
         
+        // Display with rarity coloring
         let color = "var(--accent)";
-        if (rareRewards.includes(r)) color = "#00ff95"; 
-        if (legendaryRewards.includes(r)) color = "#ffaa00"; 
+        if (rareRewards.includes(r)) color = "#00ff95"; // Rare Green
+        if (legendaryRewards.includes(r)) color = "#ffaa00"; // Legendary Gold
 
         showSystemMessage("QUEST CLEAR", `Daily tasks finalized. <br>Received: <span style="color:${color}">${r}</span>`);
     }
-}
+
     // --- 4. LEVEL UP CHECK (OVERFLOW + SCALING) ---
     // Formula: Every level requires 100 + (Level * 5)
     let nextLevelGoal = 100 + (p.level * 5);
@@ -828,49 +674,11 @@ function checkDailyRewards() {
             playSfx('levelUp');
             showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
         }
+    }
 
     save(); 
     updateUI(); 
     render('mission');
-}
-    function triggerQuestFailure() {
-        // Force hide the initialization overlays
-        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        
-        playSfx('alert');
-        
-        // Apply Penalties immediately to the data
-        if (p.level > 1) p.level--;
-        p.streak = 0;
-        p.exp = 0;
-        p.lastUpdate = new Date().toDateString(); // Set to today so it doesn't loop
-        generateQuests();
-        save();
-
-        // Show the failure screen
-        const failOverlay = document.createElement('div');
-        failOverlay.className = 'overlay';
-        failOverlay.id = "failure-screen";
-        failOverlay.style.zIndex = "9999";
-        failOverlay.innerHTML = `
-            <div class="hologram" style="border-color: var(--danger); box-shadow: 0 0 30px rgba(255,0,0,0.3);">
-                <div class="penalty-text">WARNING</div>
-                <p style="color:#fff; font-size:0.9rem;">DAILY QUESTS INCOMPLETE.</p>
-                <p style="color:var(--danger); font-family:'JetBrains Mono'; font-size:0.7rem;">
-                    PENALTY PROTOCOL INITIATED:<br>LEVEL REDUCED / STREAK RESET
-                </p>
-                <button class="btn btn-cancel" onclick="acknowledgePenalty()" style="margin-top:20px;">ACKNOWLEDGE</button>
-            </div>
-        `;
-        document.body.appendChild(failOverlay);
-        document.body.classList.add('penalty-bg');
-    }
-
-    function acknowledgePenalty() {
-    document.body.classList.remove('penalty-bg');
-    const failScreen = document.getElementById('failure-screen');
-    if (failScreen) failScreen.remove();
-    boot(); 
 }
     const itemEffects = {
     "Rest Protocol": { desc: "Increases Vitality (VIT) by 5. Purple Grade.", run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }},
@@ -1031,32 +839,15 @@ function consumeItem(itemName) {
     }
 
     function updateTimer() {
-    const now = new Date();
-    const tonight = new Date();
-    tonight.setHours(23, 59, 59, 999);
-
-    const diff = tonight - now;
-
-    if (diff <= 0) {
-        // CHECK: If there are unfinished quests, fail them!
-        const unfinished = p.missions.some(m => !m.done);
-        if (unfinished) {
-            triggerQuestFailure();
-        } else {
-            // If they were all done, just refresh quests for tomorrow
-            generateQuests();
-            location.reload(); 
-        }
-        return;
+        const el = document.getElementById('timer');
+        if(!el) return;
+        const end = new Date(); end.setHours(23,59,59,999);
+        const diff = end - new Date();
+        const h = Math.floor(diff/3600000).toString().padStart(2,'0');
+        const m = Math.floor((diff%3600000)/60000).toString().padStart(2,'0');
+        const s = Math.floor((diff%60000)/1000).toString().padStart(2,'0');
+        el.innerText = `${h}:${m}:${s}`;
     }
-
-    const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-    const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-
-    const timerEl = document.getElementById('timer');
-    if (timerEl) timerEl.innerText = `${h}:${m}:${s}`;
-}
     
     function showSystemMessage(title, body) {
         playSfx('ping'); // <--- Add this line
@@ -1105,63 +896,40 @@ function consumeItem(itemName) {
     function fetchLeaderboard() {
     const lbDisplay = document.getElementById('leaderboard-display');
     
+    // Querying 'hunters' collection by Level (Highest to Lowest)
     db.collection('hunters')
-      .orderBy('level', 'desc') // Primary Sort
-      .orderBy('exp', 'desc')   // Secondary Sort (The Tie-Breaker)
+      .orderBy('level', 'desc')
       .limit(20)
       .onSnapshot(snapshot => {
+          if (!document.getElementById('leaderboard-display')) return; // Exit if user switched tabs
+          
           lbDisplay.innerHTML = "";
+          
           snapshot.docs.forEach((doc, index) => {
               const data = doc.data();
-              const currentRank = index + 1;
-              
-              lbDisplay.innerHTML += `
-                  <div class="lb-item" onclick="showProfile('${doc.id}')" style="cursor:pointer">
-                      <div class="lb-rank">${currentRank.toString().padStart(2, '0')}</div>
-                      <div class="lb-info">
-                          <span class="name">${data.name || "UNKNOWN"}</span>
-                          <span class="job">${data.job || "HUNTER"}</span>
-                      </div>
-                      <div class="lb-level">LVL ${data.level}</div>
+              const isMe = auth.currentUser && auth.currentUser.uid === doc.id;
+              const rank = index + 1;
+
+              const item = document.createElement('div');
+              item.className = `lb-item ${isMe ? 'is-me' : ''}`;
+              item.innerHTML = `
+                  <div class="lb-rank">${rank.toString().padStart(2, '0')}</div>
+                  <div class="lb-info">
+                      <span class="name">${data.name || "UNKNOWN"} ${isMe ? '(YOU)' : ''}</span>
+                      <span class="job">${data.job || "UNAWAKENED"}</span>
                   </div>
+                  <div class="lb-level">LVL ${data.level}</div>
               `;
+              lbDisplay.appendChild(item);
           });
       }, error => {
-          console.log("Index Error: ", error.message);
-          // If you see an error here, check the link in the browser console (F12)
+          console.error("Leaderboard Error:", error);
+          lbDisplay.innerHTML = `<div style="color:var(--danger); font-size:0.7rem;">FAILED TO SYNC RANKINGS. CHECK INDEXES.</div>`;
       });
-}
-    function showProfile(userId) {
-    db.collection('hunters').doc(userId).get().then((doc) => {
-        if (doc.exists) {
-            const hunterData = doc.data(); // Use 'hunterData', NOT 'p'
-            document.getElementById('p-name').innerText = hunterData.name || "UNKNOWN";
-            document.getElementById('p-level').innerText = hunterData.level || 0;
-            document.getElementById('p-exp').innerText = Math.floor(hunterData.exp || 0);
-            document.getElementById('p-streak').innerText = hunterData.streak || 0;
-            document.getElementById('profile-overlay').style.display = 'flex';
-        }
-    });
-}
-
-function closeProfile() {
-    document.getElementById('profile-overlay').style.display = 'none';
 }
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
