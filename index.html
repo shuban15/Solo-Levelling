@@ -589,73 +589,26 @@ function checkDailyCompletion() {
     }
 }
 
-// Step 2: The Execution (Gives rewards)
-function executeMission(id) {
-    const confirmOverlay = document.getElementById('confirm-overlay');
-    if (confirmOverlay) confirmOverlay.remove();
+    function gainExp(amount) {
+    if (!p) return;
     
-    // --- 1. DYNAMIC EXP REWARD ---
-    let mission = p.missions[id] || p.missions.find(m => m.id === id);
-    let expGain = 10; // Base for INT/FOC/VIT
+    // 1. Add the EXP (Handles positive rewards and negative penalties)
+    p.exp += amount;
+    if (p.exp < 0) p.exp = 0; 
 
-    if (mission.s === 'STR' || mission.s === 'AGI') expGain = 15; // Physical bonus
-    if (mission.isSurprise) expGain = 30; // Surprise quest bonus
-    
-    // Apply rewards
-    mission.done = true;
-    p.stats[mission.s]++;
-    p.exp += expGain;
-
-    // --- 2. PENALTY CHECK (Lv. 10-15 Logic) ---
-    const surpriseQuest = p.missions.find(m => m.isSurprise);
-    const regularMissions = p.missions.filter(m => !m.isSurprise);
-    const allRegularsDone = regularMissions.every(m => m.done);
-
-    if (p.level >= 10 && p.level <= 15 && allRegularsDone && surpriseQuest && !surpriseQuest.done) {
-        p.exp = Math.max(0, p.exp - 30);
-        playSfx('alert');
-        showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
-    }
-
-    // --- 3. DAILY CLEAR REWARD ---
-    // --- 3. DAILY CLEAR REWARD ---
-    // --- 3. DAILY CLEAR REWARD ---
-    if (p.missions.every(m => m.done)) {
-        p.streak++;
-        
-        // Define reward tiers
-        const commonRewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
-        const rareRewards = ["Shadow Essence", "Warrior's Spirit", "Scholar's Scroll", "Elixir of Life"];
-        const legendaryRewards = ["System Key", "Elixir of Greatness"]; // Greatness = +5 to ALL stats
-
-        let pool = [...commonRewards];
-        
-        // At Level 20+, Rare items enter the pool
-        if (p.level >= 20) pool.push(...rareRewards);
-        
-        // At Level 30+, the System Key (Legendary) has a chance to drop
-        if (p.level >= 30) pool.push(...legendaryRewards);
-
-        const r = pool[Math.floor(Math.random() * pool.length)];
-        p.cargo[r] = (p.cargo[r] || 0) + 1;
-        
-        // Display with rarity coloring
-        let color = "var(--accent)";
-        if (rareRewards.includes(r)) color = "#00ff95"; // Rare Green
-        if (legendaryRewards.includes(r)) color = "#ffaa00"; // Legendary Gold
-
-        showSystemMessage("QUEST CLEAR", `Daily tasks finalized. <br>Received: <span style="color:${color}">${r}</span>`);
-    }
-
-    // --- 4. LEVEL UP CHECK (OVERFLOW + SCALING) ---
-    // Formula: Every level requires 100 + (Level * 5)
+    // 2. Define the goal formula (Must match updateUI)
     let nextLevelGoal = 100 + (p.level * 5);
 
+    // 3. The Overflow Loop
+    // This runs as long as your EXP is higher than the requirement
     while (p.exp >= nextLevelGoal) {
-        p.exp -= nextLevelGoal; // Subtract cost (Overflow balance carried over)
+        p.exp -= nextLevelGoal; // Subtract cost, keep the "extra"
         p.level++;
-        nextLevelGoal = 100 + (p.level * 5); // Update goal for next level check
+        
+        // Recalculate goal for the NEW level
+        nextLevelGoal = 100 + (p.level * 5);
 
+        // --- MILESTONE LOGIC ---
         if (p.level === 5) {
             playSfx('levelUp');
             const bonuses = ["Blessed Box", "Rest Protocol", "Focus Token"];
@@ -676,13 +629,80 @@ function executeMission(id) {
         }
     }
 
+    // 4. Update the screen immediately
+    updateUI();
+}
+    
+
+// Step 2: The Execution (Gives rewards)
+async function executeMission(id) {
+    const confirmOverlay = document.getElementById('confirm-overlay');
+    if (confirmOverlay) confirmOverlay.remove();
+    
+    // --- 1. DYNAMIC EXP REWARD ---
+    let mission = p.missions[id] || p.missions.find(m => m.id === id);
+    let expGain = 10; // Base for INT/FOC/VIT
+
+    if (mission.s === 'STR' || mission.s === 'AGI') expGain = 15; // Physical bonus
+    if (mission.isSurprise) expGain = 30; // Surprise quest bonus
+    
+    // Apply rewards
+    mission.done = true;
+    p.stats[mission.s]++;
+    
+    // CALL THE CENTRAL FUNCTION INSTEAD OF MANUAL ADDITION
+    gainExp(expGain); 
+
+    // --- 2. PENALTY CHECK (Lv. 10-15 Logic) ---
+    const surpriseQuest = p.missions.find(m => m.isSurprise);
+    const regularMissions = p.missions.filter(m => !m.isSurprise);
+    const allRegularsDone = regularMissions.every(m => m.done);
+
+    if (p.level >= 10 && p.level <= 15 && allRegularsDone && surpriseQuest && !surpriseQuest.done) {
+        // Use a negative value in gainExp to handle the penalty correctly
+        gainExp(-30); 
+        playSfx('alert');
+        showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
+    }
+
+    // --- 3. DAILY CLEAR REWARD ---
+    if (p.missions.every(m => m.done)) {
+        p.streak++;
+        
+        const commonRewards = ["Rest Protocol", "Dopamine Hit", "Focus Token", "Physical Restoration", "Blessed Box"];
+        const rareRewards = ["Shadow Essence", "Warrior's Spirit", "Scholar's Scroll", "Elixir of Life"];
+        const legendaryRewards = ["System Key", "Elixir of Greatness"];
+
+        let pool = [...commonRewards];
+        if (p.level >= 20) pool.push(...rareRewards);
+        if (p.level >= 30) pool.push(...legendaryRewards);
+
+        const r = pool[Math.floor(Math.random() * pool.length)];
+        p.cargo[r] = (p.cargo[r] || 0) + 1;
+        
+        let color = "var(--accent)";
+        if (rareRewards.includes(r)) color = "#00ff95";
+        if (legendaryRewards.includes(r)) color = "#ffaa00";
+
+        showSystemMessage("QUEST CLEAR", `Daily tasks finalized. <br>Received: <span style="color:${color}">${r}</span>`);
+    }
+
+    // --- 4. LEVEL UP CHECK REMOVED ---
+    // (This is now handled automatically inside gainExp)
+
     save(); 
     updateUI(); 
     render('mission');
 }
     const itemEffects = {
     "Rest Protocol": { desc: "Increases Vitality (VIT) by 5. Purple Grade.", run: () => { p.stats.VIT += 5; return "VIT increased by 5."; }},
-    "Dopamine Hit": { desc: "Grants 15 EXP. Purple Grade.", run: () => { p.exp += 15; return "EXP increased by 15."; }},
+    "Dopamine Hit": { 
+        desc: "Grants 15 EXP.", 
+        run: () => { 
+            gainExp(15); // Calls the overflow logic
+            return "EXP increased by 15."; 
+        }
+    },
     "Focus Token": { desc: "Increases Focus (FOC) by 5. Purple Grade.", run: () => { p.stats.FOC += 5; return "FOC increased by 5."; }},
     "Physical Restoration": { desc: "Increases STR and AGI by 2. Purple Grade.", run: () => { p.stats.STR += 2; p.stats.AGI += 2; return "Physical stats restored."; }},
     "Blessed Box": { desc: "Random +5 to any stat. Purple Grade.", run: () => { 
@@ -692,7 +712,13 @@ function executeMission(id) {
     "Shadow Essence": { desc: "Rare: AGI +5. Green Grade.", run: () => { p.stats.AGI += 5; return "AGI +5."; }},
     "Warrior's Spirit": { desc: "Rare: STR +5. Green Grade.", run: () => { p.stats.STR += 5; return "STR +5."; }},
     "Scholar's Scroll": { desc: "Rare: INT +5. Green Grade.", run: () => { p.stats.INT += 5; return "INT +5."; }},
-    "Elixir of Life": { desc: "Rare: Grants 50 EXP. Green Grade.", run: () => { p.exp += 50; return "EXP +50."; }},
+    "Elixir of Life": { 
+        desc: "Grants 50 EXP.", 
+        run: () => { 
+            gainExp(50); // Calls the overflow logic
+            return "EXP +50."; 
+        }
+    },
     "Elixir of Greatness": { desc: "Legendary: ALL STATS +5. Gold Grade.", run: () => { 
         Object.keys(p.stats).forEach(k => p.stats[k] += 5); return "All stats increased by 5."; 
     }},
@@ -865,32 +891,48 @@ function consumeItem(itemName) {
 }
 
     function updateUI() {
-    const nextLvlExp = 100 + (p.level * 5);; // Your system's max exp formula
+    if (!p) return; // Safety check for player object
+
+    // 1. CALCULATE CURRENT LEVEL GOAL
+    // Must match the gainExp formula exactly: 100 + (Level * 5)
+    const nextLvlExp = 100 + (p.level * 5); 
     
-    // Update numerical displays
-    document.getElementById('lvl-display').innerText = p.level.toString().padStart(2, '0');
-    document.getElementById('streak-display').innerText = p.streak;
-    document.getElementById('job-display').innerText = p.job;
+    // 2. UPDATE NUMERICAL DISPLAYS
+    const lvlDisplay = document.getElementById('lvl-display');
+    if (lvlDisplay) lvlDisplay.innerText = p.level.toString().padStart(2, '0');
     
-    // Update Rank based on level
+    const streakDisplay = document.getElementById('streak-display');
+    if (streakDisplay) streakDisplay.innerText = p.streak;
+    
+    const jobDisplay = document.getElementById('job-display');
+    if (jobDisplay) jobDisplay.innerText = p.job;
+    
+    // 3. UPDATE RANK BASED ON LEVEL
     const ranks = ['E','D','C','B','A','S'];
     const rankIndex = Math.min(Math.floor(p.level/15), 5);
-    document.getElementById('rank-display').innerText = "RANK: " + ranks[rankIndex];
+    const rankDisplay = document.getElementById('rank-display');
+    if (rankDisplay) rankDisplay.innerText = "RANK: " + ranks[rankIndex];
     
-    // Update EXP Bar width
-    const expPercent = (p.exp / nextLvlExp) * 100;
-    document.getElementById('exp-fill').style.width = expPercent + "%";
+    // 4. UPDATE EXP BAR WIDTH
+    // Math.min ensures the bar never visually "pops" out of its container
+    const expPercent = Math.min((p.exp / nextLvlExp) * 100, 100);
+    const expFill = document.getElementById('exp-fill');
+    if (expFill) {
+        expFill.style.width = expPercent + "%";
+    }
     
-    // Update EXP Counter text (Current / Max)
-    document.getElementById('exp-counter').innerText = `${p.exp} / ${nextLvlExp} EXP`;
-
+    // 5. UPDATE EXP COUNTER TEXT AND GLOW EFFECT
     const counterEl = document.getElementById('exp-counter');
-    if (expPercent > 80) {
-        counterEl.style.color = "var(--accent)";
-        counterEl.style.textShadow = "0 0 5px var(--accent)";
-    } else {
-        counterEl.style.color = "#555";
-        counterEl.style.textShadow = "none";
+    if (counterEl) {
+        counterEl.innerText = `${Math.floor(p.exp)} / ${nextLvlExp} EXP`;
+
+        if (expPercent > 80) {
+            counterEl.style.color = "var(--accent)";
+            counterEl.style.textShadow = "0 0 5px var(--accent)";
+        } else {
+            counterEl.style.color = "#555";
+            counterEl.style.textShadow = "none";
+        }
     }
 }
     function fetchLeaderboard() {
@@ -930,6 +972,7 @@ function consumeItem(itemName) {
 </script>
 </body>
 </html>
+
 
 
 
