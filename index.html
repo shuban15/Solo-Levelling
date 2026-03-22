@@ -371,32 +371,20 @@
 
 <script>
     // --- UPDATED SYSTEM SOUNDS ---
-const sounds = {
-    // Sharp digital "Chime" for standard notifications
-    ping: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/system-notification.mp3'), 
-    
-    // Heavy electronic "Thud/Level Up"
-    levelUp: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/level-up.mp3'),
-    
-    // Quick "Blade/Woosh" sound for menu clicks
-    click: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/ui-click.mp3'),
-    
-    // Glitchy "Danger" sound for Surprise Quests/Alerts
-    alert: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/system-alert.mp3'),
-    
-    // High-pitched "Crystal" sound for item consumption
-    consume: new Audio('https://raw.githubusercontent.com/Aris-T004/Test-Assets/main/item-use.mp3')
+const systemSFX = {
+    level_up: new Audio('level_up.mp3'),           //
+    reward: new Audio('reward consume sound.mp3'), //
+    popup: new Audio('pop_up.mp3'),  
+    click: new Audio('click_up.mp3')                //
 };
 
 function playSfx(type) {
-    if (sounds[type]) {
-        const sfx = sounds[type];
-        sfx.currentTime = 0; 
-        sfx.volume = 0.5; // Slightly louder for impact
-        sfx.play().catch(e => console.warn("Interaction required for audio."));
+    const sound = systemSFX[type];
+    if (sound) {
+        sound.currentTime = 0; 
+        sound.play().catch(e => console.log("Audio waiting for user interaction."));
     }
-}
-    // --- FIREBASE CONFIG ---
+}    // --- FIREBASE CONFIG ---
     const firebaseConfig = {
         apiKey: "AIzaSyBBveJmrWxVnnalA34G7KZR6COhrOcxiok",
         authDomain: "solo-levelling-system-5edae.firebaseapp.com",
@@ -468,7 +456,8 @@ function playSfx(type) {
             const incomplete = p.missions.some(m => !m.done);
             if (incomplete && p.level > 1) {
                 p.level--; p.streak = 0;
-                alert("PENALTY PROTOCOL: Daily Quest Incomplete. Level Reduced.");
+                showSystemMessage("PENALTY PROTOCOL: Daily Quest Incomplete. Level Reduced.");
+                playSfx('popup');
             }
             p.lastUpdate = today;
             generateQuests();
@@ -577,12 +566,14 @@ function checkDailyCompletion() {
         // If regular quests are done but a Surprise Quest exists and is NOT done
         if (surpriseMission && !surpriseMission.done) {
             p.exp = Math.max(0, p.exp - 30); // Deduct 30 EXP
-            playSfx('alert');
+            playSfx('pop_up');
             showSystemMessage("PENALTY APPLIED", "Regular quests cleared, but Surprise Quest was ignored. <br><br>-30 EXP deducted.");
         } else {
             // Standard rewards for full completion
             p.streak++;
+            playSfx('pop_up');
             showSystemMessage("QUEST CLEAR", "All missions completed successfully.");
+            
         }
         save();
         updateUI();
@@ -610,21 +601,22 @@ function checkDailyCompletion() {
 
         // --- MILESTONE LOGIC ---
         if (p.level === 5) {
-            playSfx('levelUp');
+            playSfx('level_up');
             const bonuses = ["Blessed Box", "Rest Protocol", "Focus Token"];
             bonuses.forEach(item => { p.cargo[item] = (p.cargo[item] || 0) + 1; });
             showSystemMessage("MILESTONE 5", `Level 5 reached. Bonus rewards granted.`);
+            playSfx('pop_up');
         } 
         else if (p.level === 10) {
             document.body.classList.add('system-glitch');
-            playSfx('alert');
             setTimeout(() => {
                 document.body.classList.remove('system-glitch');
+                playSfx('pop_up');
                 showSystemMessage("SYSTEM OVERRIDE", `LEVEL 10: SURPRISE QUESTS UNLOCKED. Penalty active.`);
             }, 1000);
         } 
         else {
-            playSfx('levelUp');
+            playSfx('level_up');
             showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
         }
     }
@@ -661,7 +653,7 @@ async function executeMission(id) {
     if (p.level >= 10 && p.level <= 15 && allRegularsDone && surpriseQuest && !surpriseQuest.done) {
         // Use a negative value in gainExp to handle the penalty correctly
         gainExp(-30); 
-        playSfx('alert');
+        playSfx('pop_up');
         showSystemMessage("PENALTY", "Regular quests cleared, but Surprise Quest was ignored. <br><br><span style='color:var(--danger)'>-30 EXP Deducted.</span>");
     }
 
@@ -735,7 +727,7 @@ function handleItemInteraction(itemName) {
     if (now - lastTap < 300) {
         // DOUBLE TAP -> CONSUME
         consumeItem(itemName);
-        playSfx('consume');
+        playSfx('reward');
     } else {
         // SINGLE TAP -> SHOW DEFINITION
         // We use a small timeout to ensure we aren't about to double tap
@@ -762,11 +754,12 @@ function consumeItem(itemName) {
         const resultText = itemEffects[itemName].run(); // Calls the 'run' function
         
         showSystemMessage("ITEM CONSUMED", resultText);
+        playSfx('reward');
         
         // Level up check
         if (p.exp >= p.level * 100) {
             p.level++; p.exp = 0;
-            playSfx('levelUp');
+            playSfx('level_up');
             showSystemMessage("LEVEL UP", `Reached Level ${p.level}`);
         }
         
